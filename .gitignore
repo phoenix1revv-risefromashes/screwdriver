@@ -1,6 +1,5 @@
 # Local development tools
 .tools/
-uv.lock
 
 # Virtual environment
 .venv/
