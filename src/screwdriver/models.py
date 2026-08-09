@@ -393,6 +393,94 @@ class NetworkInfo:
 
 
 @dataclass(slots=True)
+class DeviceNode:
+    """Describe a Linux device node associated with hardware."""
+
+    path: str
+    node_type: str
+    permissions: str
+    owner: str | None
+    group: str | None
+    readable: bool
+    writable: bool
+
+    @property
+    def access(self) -> str:
+        if self.readable and self.writable:
+            return "read-write"
+        if self.readable:
+            return "read-only"
+        if self.writable:
+            return "write-only"
+        return "denied"
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "path": self.path,
+            "node_type": self.node_type,
+            "permissions": self.permissions,
+            "owner": self.owner,
+            "group": self.group,
+            "readable": self.readable,
+            "writable": self.writable,
+            "access": self.access,
+        }
+
+
+@dataclass(slots=True)
+class USBDevice:
+    """Describe one physical USB device."""
+
+    sysfs_name: str
+    vendor_id: str
+    product_id: str
+    manufacturer: str | None = None
+    product_name: str | None = None
+    serial_number: str | None = None
+    bus_number: int | None = None
+    device_number: int | None = None
+    usb_version: str | None = None
+    speed_mbps: float | None = None
+    device_class: str | None = None
+    device_class_name: str | None = None
+    drivers: list[str] = field(default_factory=list)
+    device_nodes: list[DeviceNode] = field(default_factory=list)
+
+    @property
+    def usb_id(self) -> str:
+        return f"{self.vendor_id}:{self.product_id}"
+
+    @property
+    def display_name(self) -> str:
+        parts = [
+            self.manufacturer,
+            self.product_name,
+        ]
+        name = " ".join(part for part in parts if part)
+        return name or f"USB device {self.usb_id}"
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "sysfs_name": self.sysfs_name,
+            "usb_id": self.usb_id,
+            "vendor_id": self.vendor_id,
+            "product_id": self.product_id,
+            "manufacturer": self.manufacturer,
+            "product_name": self.product_name,
+            "display_name": self.display_name,
+            "serial_number": self.serial_number,
+            "bus_number": self.bus_number,
+            "device_number": self.device_number,
+            "usb_version": self.usb_version,
+            "speed_mbps": self.speed_mbps,
+            "device_class": self.device_class,
+            "device_class_name": self.device_class_name,
+            "drivers": self.drivers.copy(),
+            "device_nodes": [node.to_dict() for node in self.device_nodes],
+        }
+
+
+@dataclass(slots=True)
 class SystemSnapshot:
     """Represent a complete passive inspection of one Linux computer."""
 
@@ -406,6 +494,7 @@ class SystemSnapshot:
     thermal_sensors: list[ThermalSensor]
     power: PowerInfo
     network: NetworkInfo
+    usb_devices: list[USBDevice] = field(default_factory=list)
     schema_version: str = "2.0"
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     components: list[Component] = field(default_factory=list)
@@ -425,6 +514,7 @@ class SystemSnapshot:
             "thermal_sensors": [sensor.to_dict() for sensor in self.thermal_sensors],
             "power": self.power.to_dict(),
             "network": self.network.to_dict(),
+            "usb_devices": [device.to_dict() for device in self.usb_devices],
             "components": [component.to_dict() for component in self.components],
             "findings": [finding.to_dict() for finding in self.findings],
         }

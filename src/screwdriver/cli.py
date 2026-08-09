@@ -1,557 +1,895 @@
-"""Command-line interface for Screwdriver."""
+"""Define the command-line interface and human-readable host report."""
 
 from __future__ import annotations
 
-import json
+import argparse
+import time
+from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated
-
-import typer
 
 from screwdriver.collectors import collect_host
-from screwdriver.models import SystemSnapshot
-from screwdriver.storage import ReportPaths, save_reports
-
-app = typer.Typer(
-    name="screwdriver",
-    help="Passively inspect a Linux or robotics computer.",
-    no_args_is_help=True,
-    add_completion=False,
+from screwdriver.models import (
+    FindingSeverity,
+    NetworkInterface,
+    SystemSnapshot,
+    USBDevice,
 )
+from screwdriver.storage import ReportPaths, build_report_paths, save_reports
+
+_WIDTH = 72
 
 
-@app.callback()
-def root() -> None:
-    """Screwdriver system-inspection commands."""
+def build_parser() -> argparse.ArgumentParser:
+    """Create Screwdriver's argument parser."""
+
+    parser = argparse.ArgumentParser(
+        prog="screwdriver",
+        description="Passively inspect a Linux-based robotic computer.",
+    )
+    subparsers = parser.add_subparsers(dest="command")
+    inspect_parser = subparsers.add_parser(
+        "inspect",
+        help="Inspect the local computer without changing device state.",
+    )
+    modes = inspect_parser.add_mutually_exclusive_group()
+    modes.add_argument(
+        "--local",
+        action="store_true",
+        help="Use deterministic offline collection and diagnostic rules (default).",
+    )
+    modes.add_argument(
+        "--agentic",
+        action="store_true",
+        help="Reserve agent-assisted interpretation for a later implementation.",
+    )
+    inspect_parser.add_argument(
+        "--focus",
+        help="Focus future agent-assisted interpretation on one subsystem.",
+    )
+    inspect_parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("reports"),
+        help="Report directory (default: reports).",
+    )
+    return parser
 
 
-@app.command("inspect")
-def inspect_system(
-    output_directory: Annotated[
-        Path,
-        typer.Option(
-            "--output",
-            "-o",
-            help="Directory where inspection reports will be saved.",
-        ),
-    ] = Path("reports"),
-    json_output: Annotated[
-        bool,
-        typer.Option(
-            "--json",
-            help="Print the complete snapshot as JSON.",
-        ),
-    ] = False,
-) -> None:
-    """Inspect the current computer without changing its state."""
+def main(argv: Sequence[str] | None = None) -> int:
+    """Run Screwdriver's CLI."""
 
-    typer.echo("Inspecting system in passive mode...")
+    parser = build_parser()
+    args = parser.parse_args(argv)
 
-    try:
-        snapshot = collect_host()
-        terminal_report = build_terminal_report(snapshot)
+    if args.command is None:
+        parser.print_help()
+        return 0
 
-        report_paths = save_reports(
-            snapshot=snapshot,
-            terminal_report=terminal_report,
-            output_directory=output_directory,
-        )
-    except KeyboardInterrupt:
-        typer.echo("\nInspection cancelled.", err=True)
-        raise typer.Exit(code=130) from None
-    except Exception as error:
-        typer.echo(f"Inspection failed: {error}", err=True)
-        raise typer.Exit(code=1) from error
+    if args.command == "inspect":
+        if args.focus and not args.agentic:
+            parser.error("--focus can only be used with --agentic")
 
-    if json_output:
-        typer.echo(json.dumps(snapshot.to_dict(), indent=2))
-        return
+        return _run_inspect(args)
 
-    typer.echo()
-    typer.echo(terminal_report)
-    typer.echo()
-    typer.echo(_render_saved_reports(report_paths))
+    parser.error(f"Unknown command: {args.command}")
+    return 2
 
 
-def build_terminal_report(snapshot: SystemSnapshot) -> str:
-    """Build a clean terminal representation of a system snapshot."""
+def _run_inspect(args: argparse.Namespace) -> int:
+    """Collect, format, save, and display one passive inspection."""
 
-    sections = [
-        _render_header(snapshot),
-        _render_identity(snapshot),
-        _render_operating_system(snapshot),
-        _render_platform(snapshot),
-        _render_cpu(snapshot),
-        _render_memory(snapshot),
-        _render_storage(snapshot),
-        _render_gpus(snapshot),
-        _render_thermal(snapshot),
-        _render_power(snapshot),
-        _render_network(snapshot),
-        _render_components(snapshot),
-        _render_findings(snapshot),
-    ]
+    started_monotonic = time.monotonic()
+    started_at = datetime.now(UTC)
 
-    return "\n\n".join(sections)
+    snapshot = collect_host()
 
+    duration = time.monotonic() - started_monotonic
+    mode = "agentic" if args.agentic else "local"
+    paths = build_report_paths(args.output)
 
-def _render_header(snapshot: SystemSnapshot) -> str:
-    """Render the inspection heading."""
-
-    return "\n".join(
-        [
-            "SCREWDRIVER SYSTEM INSPECTION",
-            "=" * 72,
-            f"Host:       {snapshot.identity.hostname}",
-            f"Created:    {snapshot.created_at.isoformat()}",
-            "Mode:       PASSIVE",
-            f"Schema:     {snapshot.schema_version}",
-        ]
+    report = format_snapshot(
+        snapshot,
+        mode=mode,
+        started_at=started_at,
+        duration=duration,
+        paths=paths,
+        focus=args.focus,
     )
 
+    save_reports(snapshot, report, args.output)
+    print(report)
 
-def _render_identity(snapshot: SystemSnapshot) -> str:
-    """Render host identity information."""
-
-    identity = snapshot.identity
-
-    return _section(
-        "IDENTITY",
-        [
-            ("Hostname", identity.hostname),
-            ("User", identity.username),
-            ("Effective user", identity.effective_username),
-            ("UID / GID", f"{identity.uid} / {identity.gid}"),
-            ("Groups", ", ".join(identity.groups) or "none"),
-            ("Login shell", identity.login_shell),
-            ("Machine ID", identity.machine_id),
-        ],
-    )
+    return 0
 
 
-def _render_operating_system(snapshot: SystemSnapshot) -> str:
-    """Render operating-system information."""
-
-    operating_system = snapshot.operating_system
-
-    return _section(
-        "OPERATING SYSTEM",
-        [
-            ("Distribution", operating_system.distribution),
-            ("Kernel", operating_system.kernel),
-            ("Architecture", operating_system.architecture),
-            ("Boot mode", operating_system.boot_mode),
-            ("Init system", operating_system.init_system),
-            ("Package manager", operating_system.package_manager),
-            ("Timezone", operating_system.timezone),
-            ("Boot time", operating_system.boot_time.isoformat()),
-            ("Uptime", _format_duration(operating_system.uptime_seconds)),
-            ("Processes", str(operating_system.process_count)),
-        ],
-    )
-
-
-def _render_platform(snapshot: SystemSnapshot) -> str:
-    """Render physical-board or virtual-platform information."""
-
-    platform = snapshot.platform
-
-    rows = [
-        ("Machine type", platform.machine_type),
-        ("Family", platform.family),
-        ("Manufacturer", platform.manufacturer),
-        ("Product", platform.product_name),
-        ("Board", platform.board_name),
-        ("Board version", platform.board_version),
-        ("Firmware", platform.firmware_version),
-        ("Serial number", platform.serial_number),
-        ("Virtualization", platform.virtualization),
-        ("Enrichment", platform.enrichment_module),
-    ]
-
-    for key, value in platform.details.items():
-        rows.append((key.replace("_", " ").title(), str(value)))
-
-    return _section("PLATFORM", rows)
-
-
-def _render_cpu(snapshot: SystemSnapshot) -> str:
-    """Render processor information."""
-
-    cpu = snapshot.cpu
-
-    rows = [
-        ("Model", cpu.model),
-        ("Vendor", cpu.vendor),
-        ("Sockets", _optional_number(cpu.sockets)),
-        ("Physical cores", _optional_number(cpu.physical_cores)),
-        ("Logical CPUs", str(cpu.logical_cpus)),
-        ("Online CPUs", str(cpu.online_cpus)),
-        ("Current frequency", _format_frequency(cpu.current_frequency_mhz)),
-        ("Minimum frequency", _format_frequency(cpu.minimum_frequency_mhz)),
-        ("Maximum frequency", _format_frequency(cpu.maximum_frequency_mhz)),
-        ("Usage", f"{cpu.usage_percent:.1f}%"),
-        ("Governor", cpu.governor),
-    ]
-
-    if cpu.load_average is not None:
-        rows.append(
-            (
-                "Load average",
-                " / ".join(f"{value:.2f}" for value in cpu.load_average),
-            )
-        )
-
-    for cache_name, cache_size in cpu.caches.items():
-        rows.append((cache_name, cache_size))
-
-    return _section("CPU", rows)
-
-
-def _render_memory(snapshot: SystemSnapshot) -> str:
-    """Render memory and swap information."""
-
-    memory = snapshot.memory
-
-    return _section(
-        "MEMORY",
-        [
-            ("Total", _format_bytes(memory.total_bytes)),
-            ("Used", _format_bytes(memory.used_bytes)),
-            ("Available", _format_bytes(memory.available_bytes)),
-            ("Usage", f"{memory.usage_percent:.1f}%"),
-            ("Shared", _format_bytes(memory.shared_bytes)),
-            ("Swap total", _format_bytes(memory.swap_total_bytes)),
-            ("Swap used", _format_bytes(memory.swap_used_bytes)),
-            ("Swap free", _format_bytes(memory.swap_free_bytes)),
-            ("Swap usage", f"{memory.swap_usage_percent:.1f}%"),
-        ],
-    )
-
-
-def _render_storage(snapshot: SystemSnapshot) -> str:
-    """Render storage devices and filesystems."""
-
-    lines = ["STORAGE", "-" * 72]
-
-    if not snapshot.storage_devices:
-        lines.append("No storage devices detected.")
-        return "\n".join(lines)
-
-    for device in snapshot.storage_devices:
-        lines.append(
-            f"{device.path} | {device.media_type} | {_format_bytes(device.capacity_bytes)}"
-        )
-        lines.append(
-            f"  Model: {_optional(device.model)} | "
-            f"Connection: {_optional(device.connection)} | "
-            f"Read-only: {_yes_no(device.read_only)}"
-        )
-
-        if not device.partitions:
-            lines.append("  Partitions: none detected")
-            continue
-
-        for partition in device.partitions:
-            usage = (
-                f"{partition.usage_percent:.1f}%"
-                if partition.usage_percent is not None
-                else "unknown"
-            )
-
-            lines.append(
-                f"  {partition.path} -> "
-                f"{_optional(partition.mount_point)} | "
-                f"{_optional(partition.filesystem)} | "
-                f"usage {usage}"
-            )
-
-    return "\n".join(lines)
-
-
-def _render_gpus(snapshot: SystemSnapshot) -> str:
-    """Render graphics and compute accelerators."""
-
-    lines = ["GPU / ACCELERATORS", "-" * 72]
-
-    if not snapshot.gpus:
-        lines.append("No GPU or compute accelerator detected.")
-        return "\n".join(lines)
-
-    for gpu in snapshot.gpus:
-        lines.append(f"{gpu.vendor}: {gpu.model}")
-        lines.append(f"  Driver: {_optional(gpu.driver)} | Bus: {_optional(gpu.bus_id)}")
-
-        runtime_values: list[str] = []
-
-        if gpu.memory_bytes is not None:
-            runtime_values.append(f"memory {_format_bytes(gpu.memory_bytes)}")
-
-        if gpu.usage_percent is not None:
-            runtime_values.append(f"usage {gpu.usage_percent:.1f}%")
-
-        if gpu.temperature_celsius is not None:
-            runtime_values.append(f"temperature {gpu.temperature_celsius:.1f} C")
-
-        if runtime_values:
-            lines.append(f"  Runtime: {', '.join(runtime_values)}")
-
-    return "\n".join(lines)
-
-
-def _render_thermal(snapshot: SystemSnapshot) -> str:
-    """Render temperature sensors."""
-
-    lines = ["THERMAL", "-" * 72]
-
-    if not snapshot.thermal_sensors:
-        lines.append("No readable thermal sensors detected.")
-        return "\n".join(lines)
-
-    for sensor in snapshot.thermal_sensors:
-        limits: list[str] = []
-
-        if sensor.high_celsius is not None:
-            limits.append(f"high {sensor.high_celsius:.1f} C")
-
-        if sensor.critical_celsius is not None:
-            limits.append(f"critical {sensor.critical_celsius:.1f} C")
-
-        limit_text = f" | {', '.join(limits)}" if limits else ""
-
-        lines.append(f"{sensor.name}: {sensor.temperature_celsius:.1f} C{limit_text}")
-
-    return "\n".join(lines)
-
-
-def _render_power(snapshot: SystemSnapshot) -> str:
-    """Render power-source information."""
-
-    power = snapshot.power
-
-    rows = [
-        ("Source", power.source),
-        ("Battery present", _yes_no(power.battery_present)),
-        (
-            "Battery level",
-            (f"{power.battery_percent:.1f}%" if power.battery_percent is not None else None),
-        ),
-        (
-            "Charging",
-            (_yes_no(power.charging) if power.charging is not None else None),
-        ),
-        (
-            "Time remaining",
-            (
-                _format_duration(power.seconds_remaining)
-                if power.seconds_remaining is not None
-                else None
-            ),
-        ),
-    ]
-
-    for key, value in power.details.items():
-        rows.append((key.replace("_", " ").title(), str(value)))
-
-    return _section("POWER", rows)
-
-
-def _render_network(snapshot: SystemSnapshot) -> str:
-    """Render interfaces and IPv4 routing information."""
-
-    network = snapshot.network
+def format_snapshot(
+    snapshot: SystemSnapshot,
+    *,
+    mode: str,
+    started_at: datetime,
+    duration: float,
+    paths: ReportPaths | None,
+    focus: str | None = None,
+) -> str:
+    """Format the complete universal-host snapshot for terminal display."""
 
     lines = [
-        "NETWORK",
-        "-" * 72,
-        f"Default interface: {_optional(network.default_interface)}",
-        f"Default gateway:   {_optional(network.default_gateway)}",
-        f"DNS servers:       {', '.join(network.dns_servers) or 'none'}",
-        (f"Internet route:    {_yes_no(network.internet_route_available)}"),
+        "╭" + "─" * (_WIDTH - 2) + "╮",
+        "│ " + "SCREWDRIVER".ljust(_WIDTH - 4) + " │",
+        "│ " + "Universal inspection of Linux-based robotic computers".ljust(_WIDTH - 4) + " │",
+        "│ "
+        + "Passive inspection — no hardware was activated or modified".ljust(_WIDTH - 4)
+        + " │",
+        "╰" + "─" * (_WIDTH - 2) + "╯",
+        "",
+        f"Inspection mode: {mode}",
+        f"Started:         {started_at.strftime('%Y-%m-%d %H:%M:%S UTC')}",
     ]
 
-    if not network.interfaces:
-        lines.append("Interfaces:         none detected")
-        return "\n".join(lines)
+    if focus:
+        lines.append(f"Focus:           {focus}")
 
-    lines.append("Interfaces:")
-
-    for interface in network.interfaces:
-        labels: list[str] = []
-
-        if interface.is_default_route:
-            labels.append("default")
-
-        if interface.is_virtual:
-            labels.append("virtual")
-
-        if interface.is_loopback:
-            labels.append("loopback")
-
-        label_text = f" [{', '.join(labels)}]" if labels else ""
-
-        lines.append(
-            f"  {interface.name}: {interface.state} | {interface.interface_type}{label_text}"
-        )
-        lines.append(f"    IPv4: {', '.join(interface.ipv4_addresses) or 'none'}")
-        lines.append(
-            f"    MAC: {_optional(interface.mac_address)} | "
-            f"Driver: {_optional(interface.driver)} | "
-            f"MTU: {_optional_number(interface.mtu)}"
+    if mode == "agentic":
+        lines.extend(
+            [
+                "Agentic status:  collection complete; agent reasoning not implemented yet",
+                "                 (the report below remains deterministic and offline)",
+            ]
         )
 
-    return "\n".join(lines)
+    identity = snapshot.identity
+    lines.extend(
+        _section(
+            "HOST IDENTITY",
+            [
+                _row("Hostname", identity.hostname),
+                _row("Username", identity.username),
+                _row("Effective user", identity.effective_username),
+                _row("UID / GID", f"{identity.uid} / {identity.gid}"),
+                _row("Groups", ", ".join(identity.groups) or "none"),
+                _row("Login shell", identity.login_shell),
+                _row("Machine ID", _abbreviate_secret(identity.machine_id)),
+            ],
+        )
+    )
 
+    operating_system = snapshot.operating_system
+    lines.extend(
+        _section(
+            "OPERATING SYSTEM",
+            [
+                _row("Distribution", operating_system.distribution),
+                _row("Kernel", operating_system.kernel),
+                _row("Kernel build", operating_system.kernel_build),
+                _row("Architecture", operating_system.architecture),
+                _row("Boot mode", operating_system.boot_mode),
+                _row("Init system", operating_system.init_system),
+                _row("Package manager", operating_system.package_manager),
+                _row("Timezone", operating_system.timezone),
+                _row(
+                    "Boot time",
+                    operating_system.boot_time.strftime("%Y-%m-%d %H:%M:%S UTC"),
+                ),
+                _row(
+                    "Uptime",
+                    _format_duration(operating_system.uptime_seconds),
+                ),
+                _row(
+                    "Running processes",
+                    operating_system.process_count,
+                ),
+            ],
+        )
+    )
 
-def _render_components(snapshot: SystemSnapshot) -> str:
-    """Render additional component inventory."""
+    platform_info = snapshot.platform
+    lines.extend(
+        _section(
+            "PLATFORM",
+            [
+                _row("Manufacturer", platform_info.manufacturer),
+                _row("Product", platform_info.product_name),
+                _row("Board", platform_info.board_name),
+                _row("Board revision", platform_info.board_version),
+                _row("Firmware", platform_info.firmware_version),
+                _row("Machine type", platform_info.machine_type),
+                _row(
+                    "Virtualization",
+                    platform_info.virtualization or "none detected",
+                ),
+                _row("Platform family", platform_info.family),
+                _row(
+                    "Enrichment module",
+                    platform_info.enrichment_module or "none",
+                ),
+                "Serial number:     available in snapshot.json"
+                if platform_info.serial_number
+                else "Serial number:     not reported by platform",
+            ],
+        )
+    )
 
-    lines = ["COMPONENT INVENTORY", "-" * 72]
+    if platform_info.details:
+        detail_lines = [
+            _row(
+                key.replace("_", " ").title(),
+                value,
+            )
+            for key, value in platform_info.details.items()
+        ]
 
-    if not snapshot.components:
-        lines.append("No additional components recorded.")
-        return "\n".join(lines)
+        lines.extend(
+            _section(
+                f"PLATFORM-SPECIFIC DETAILS — {platform_info.family.upper()}",
+                detail_lines,
+            )
+        )
 
-    for component in snapshot.components:
-        data = component.to_dict()
-        name = data.get("name", "unnamed component")
-        category = data.get("category", "unknown")
+    cpu = snapshot.cpu
+    cpu_lines = [
+        _row("Model", cpu.model),
+        _row("Vendor", cpu.vendor),
+        _row("Sockets", cpu.sockets),
+        _row("Physical cores", cpu.physical_cores),
+        _row("Logical CPUs", cpu.logical_cpus),
+        _row("Online CPUs", cpu.online_cpus),
+        _row(
+            "Current frequency",
+            _format_frequency(cpu.current_frequency_mhz),
+        ),
+        _row(
+            "Minimum frequency",
+            _format_frequency(cpu.minimum_frequency_mhz),
+        ),
+        _row(
+            "Maximum frequency",
+            _format_frequency(cpu.maximum_frequency_mhz),
+        ),
+        _row("CPU usage", f"{cpu.usage_percent:.1f}%"),
+        _row(
+            "Load average",
+            ", ".join(f"{value:.2f}" for value in cpu.load_average) if cpu.load_average else None,
+        ),
+        _row("Governor", cpu.governor),
+    ]
 
-        lines.append(f"{name} | {category}")
+    cpu_lines.extend(
+        _row(
+            f"Cache {name}",
+            value,
+        )
+        for name, value in cpu.caches.items()
+    )
 
-    return "\n".join(lines)
+    lines.extend(_section("CPU", cpu_lines))
 
+    memory = snapshot.memory
+    lines.extend(
+        _section(
+            "MEMORY",
+            [
+                "Physical memory:",
+                _row(
+                    "  Total",
+                    _format_bytes(memory.total_bytes),
+                ),
+                _row(
+                    "  Used",
+                    _format_bytes(memory.used_bytes),
+                ),
+                _row(
+                    "  Available",
+                    _format_bytes(memory.available_bytes),
+                ),
+                _row(
+                    "  Usage",
+                    f"{memory.usage_percent:.1f}%",
+                ),
+                _row(
+                    "  Shared",
+                    _format_bytes(memory.shared_bytes),
+                ),
+                "",
+                "Swap:",
+                _row(
+                    "  Total",
+                    _format_bytes(memory.swap_total_bytes),
+                ),
+                _row(
+                    "  Used",
+                    _format_bytes(memory.swap_used_bytes),
+                ),
+                _row(
+                    "  Available",
+                    _format_bytes(memory.swap_free_bytes),
+                ),
+                _row(
+                    "  Usage",
+                    f"{memory.swap_usage_percent:.1f}%",
+                ),
+            ],
+        )
+    )
 
-def _render_findings(snapshot: SystemSnapshot) -> str:
-    """Render diagnostic findings."""
+    storage_lines: list[str] = []
 
-    lines = ["FINDINGS", "-" * 72]
+    if not snapshot.storage_devices:
+        storage_lines.append("No physical storage devices were reported by lsblk.")
 
-    if not snapshot.findings:
-        lines.append("No findings generated by passive inspection.")
-        return "\n".join(lines)
+    for device in snapshot.storage_devices:
+        storage_lines.extend(
+            [
+                _row("Device", device.path),
+                _row("  Model", device.model),
+                _row("  Connection", device.connection),
+                _row("  Media type", device.media_type),
+                _row(
+                    "  Capacity",
+                    _format_bytes(device.capacity_bytes),
+                ),
+                _row("  Firmware", device.firmware_version),
+                _row("  Removable", _yes_no(device.removable)),
+                _row("  Read-only", _yes_no(device.read_only)),
+                "  Serial:           available in snapshot.json"
+                if device.serial_number
+                else "  Serial:           not reported",
+            ]
+        )
 
-    for index, finding in enumerate(snapshot.findings, start=1):
-        data = finding.to_dict()
-        severity = data.get("severity", "unknown")
-        title = data.get("title", "Untitled finding")
-        message = data.get("message", "")
+        if device.partitions:
+            storage_lines.append("  Filesystems:")
 
-        lines.append(f"{index}. [{str(severity).upper()}] {title}")
+        for partition in device.partitions:
+            storage_lines.extend(
+                [
+                    f"    {partition.path}",
+                    _row(
+                        "      Filesystem",
+                        partition.filesystem,
+                    ),
+                    _row(
+                        "      Mount point",
+                        partition.mount_point or "not mounted",
+                    ),
+                    _row(
+                        "      Capacity",
+                        _format_optional_bytes(partition.total_bytes),
+                    ),
+                    _row(
+                        "      Used",
+                        _format_optional_bytes(partition.used_bytes),
+                    ),
+                    _row(
+                        "      Available",
+                        _format_optional_bytes(partition.available_bytes),
+                    ),
+                    _row(
+                        "      Usage",
+                        f"{partition.usage_percent:.1f}%"
+                        if partition.usage_percent is not None
+                        else "unavailable",
+                    ),
+                ]
+            )
 
-        if message:
-            lines.append(f"   {message}")
+        storage_lines.append("")
 
-    return "\n".join(lines)
+    lines.extend(
+        _section(
+            "STORAGE DEVICES",
+            storage_lines,
+        )
+    )
 
+    gpu_lines: list[str] = []
 
-def _render_saved_reports(paths: ReportPaths) -> str:
-    """Render paths to generated report files."""
+    if not snapshot.gpus:
+        gpu_lines.append("No GPU or compute accelerator was detected.")
 
-    return "\n".join(
+    for index, gpu in enumerate(snapshot.gpus):
+        gpu_lines.extend(
+            [
+                f"GPU {index}:",
+                _row("  Vendor", gpu.vendor),
+                _row("  Model", gpu.model),
+                _row("  Driver", gpu.driver),
+                _row("  Bus ID", gpu.bus_id),
+                _row(
+                    "  Memory",
+                    _format_optional_bytes(gpu.memory_bytes),
+                ),
+                _row(
+                    "  Usage",
+                    f"{gpu.usage_percent:.1f}%" if gpu.usage_percent is not None else None,
+                ),
+                _row(
+                    "  Temperature",
+                    f"{gpu.temperature_celsius:.1f}°C"
+                    if gpu.temperature_celsius is not None
+                    else None,
+                ),
+                "",
+            ]
+        )
+
+    lines.extend(
+        _section(
+            "GRAPHICS AND COMPUTE ACCELERATORS",
+            gpu_lines,
+        )
+    )
+
+    thermal_lines: list[str] = []
+
+    if not snapshot.thermal_sensors:
+        thermal_lines.append("No readable thermal sensors were exposed to this user.")
+
+    for sensor in snapshot.thermal_sensors:
+        health = _thermal_health(
+            sensor.temperature_celsius,
+            sensor.critical_celsius,
+        )
+
+        thermal_lines.append(
+            _row(
+                sensor.name,
+                f"{sensor.temperature_celsius:.1f}°C  {health}",
+            )
+        )
+
+    lines.extend(
+        _section(
+            "THERMAL AND COOLING",
+            thermal_lines,
+        )
+    )
+
+    power = snapshot.power
+    power_lines = [
+        _row("Power source", power.source),
+        _row(
+            "Battery detected",
+            _yes_no(power.battery_present),
+        ),
+    ]
+
+    if power.battery_present:
+        power_lines.extend(
+            [
+                _row(
+                    "Battery level",
+                    f"{power.battery_percent:.1f}%" if power.battery_percent is not None else None,
+                ),
+                _row(
+                    "Charging / plugged",
+                    _yes_no(power.charging),
+                ),
+                _row(
+                    "Time remaining",
+                    _format_duration(power.seconds_remaining)
+                    if power.seconds_remaining is not None
+                    else None,
+                ),
+            ]
+        )
+
+    power_lines.extend(
+        _row(
+            key.replace("_", " ").title(),
+            value,
+        )
+        for key, value in power.details.items()
+    )
+
+    lines.extend(_section("POWER", power_lines))
+
+    network = snapshot.network
+    network_lines = [
+        _row(
+            "Default route",
+            network.default_interface,
+        ),
+        _row(
+            "Gateway",
+            network.default_gateway,
+        ),
+        _row(
+            "DNS servers",
+            ", ".join(network.dns_servers) or "none",
+        ),
+        _row(
+            "Internet route",
+            "available" if network.internet_route_available else "not detected",
+        ),
+        "",
+    ]
+
+    visible_interfaces = [
+        interface
+        for interface in network.interfaces
+        if not interface.is_loopback and not interface.is_virtual
+    ]
+
+    hidden_interfaces = [
+        interface for interface in network.interfaces if interface not in visible_interfaces
+    ]
+
+    if not visible_interfaces:
+        network_lines.append("No physical network interfaces were discovered.")
+
+    for interface in visible_interfaces:
+        network_lines.extend(_format_network_interface(interface))
+
+    network_lines.extend(
         [
-            "REPORTS SAVED",
-            "-" * 72,
-            f"JSON snapshot:  {paths.snapshot}",
-            f"Text report:    {paths.text_report}",
-            f"HTML report:    {paths.html_report}",
-            f"Inspection log: {paths.diagnostic_log}",
+            "IPv6:              excluded by output preference",
+            (f"Virtual interfaces: {len(hidden_interfaces)} detected, hidden from summary"),
         ]
     )
+
+    if hidden_interfaces:
+        network_lines.append(
+            "  Includes:        " + ", ".join(interface.name for interface in hidden_interfaces)
+        )
+        network_lines.append("  Full inventory:  available in snapshot.json")
+
+    lines.extend(_section("NETWORK", network_lines))
+
+    usb_lines: list[str] = []
+
+    if not snapshot.usb_devices:
+        usb_lines.append("No USB devices were exposed through sysfs.")
+
+    for index, usb_device in enumerate(
+        snapshot.usb_devices,
+        start=1,
+    ):
+        usb_lines.extend(
+            _format_usb_device(
+                usb_device,
+                index,
+            )
+        )
+
+    lines.extend(
+        _section(
+            "USB HARDWARE INVENTORY",
+            usb_lines,
+        )
+    )
+
+    severity_counts = {
+        severity: sum(finding.severity is severity for finding in snapshot.findings)
+        for severity in FindingSeverity
+    }
+
+    overall = (
+        "ERRORS DETECTED"
+        if severity_counts[FindingSeverity.ERROR]
+        else "HEALTHY WITH WARNINGS"
+        if severity_counts[FindingSeverity.WARNING]
+        else "HEALTHY"
+    )
+
+    summary_lines = [
+        _row("Overall status", overall),
+        _row(
+            "Warnings",
+            severity_counts[FindingSeverity.WARNING],
+        ),
+        _row(
+            "Errors",
+            severity_counts[FindingSeverity.ERROR],
+        ),
+        _row(
+            "Informational",
+            severity_counts[FindingSeverity.INFO],
+        ),
+        "",
+    ]
+
+    for finding in snapshot.findings:
+        summary_lines.append(f"[{finding.severity.value.upper()}] {finding.summary}")
+
+        if finding.evidence:
+            summary_lines.append(f"       Evidence: {finding.evidence}")
+
+        if finding.recommendation:
+            summary_lines.append(f"       Recommendation: {finding.recommendation}")
+
+    lines.extend(
+        _section(
+            "DIAGNOSTIC SUMMARY",
+            summary_lines,
+        )
+    )
+
+    report_lines = [
+        _row(
+            "Snapshot",
+            paths.snapshot if paths else "pending",
+        ),
+        _row(
+            "Terminal report",
+            paths.text_report if paths else "pending",
+        ),
+        _row(
+            "HTML report",
+            paths.html_report if paths else "pending",
+        ),
+        _row(
+            "Diagnostic log",
+            paths.diagnostic_log if paths else "pending",
+        ),
+        "",
+        _row(
+            "Duration",
+            f"{duration:.2f} seconds",
+        ),
+        _row(
+            "Completed",
+            datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC"),
+        ),
+        "",
+        "No configuration, device state, or hardware output was changed.",
+    ]
+
+    lines.extend(_section("REPORTS", report_lines))
+
+    return "\n".join(lines).rstrip()
+
+
+def _format_network_interface(
+    interface: NetworkInterface,
+) -> list[str]:
+    return [
+        _row(
+            "Interface",
+            interface.name,
+        ),
+        _row(
+            "  Type",
+            interface.interface_type,
+        ),
+        _row(
+            "  State",
+            interface.state,
+        ),
+        _row(
+            "  IPv4",
+            ", ".join(interface.ipv4_addresses) or "none",
+        ),
+        _row(
+            "  MAC",
+            interface.mac_address,
+        ),
+        _row(
+            "  Link speed",
+            f"{interface.speed_mbps:,} Mb/s" if interface.speed_mbps is not None else None,
+        ),
+        _row(
+            "  Duplex",
+            interface.duplex,
+        ),
+        _row(
+            "  Driver",
+            interface.driver,
+        ),
+        _row(
+            "  Default route",
+            _yes_no(interface.is_default_route),
+        ),
+        "",
+    ]
+
+
+def _format_usb_device(
+    device: USBDevice,
+    index: int,
+) -> list[str]:
+    location = (
+        (f"bus {device.bus_number:03d}, device {device.device_number:03d}")
+        if device.bus_number is not None and device.device_number is not None
+        else device.sysfs_name
+    )
+
+    lines = [
+        f"USB device {index}: {device.display_name}",
+        _row(
+            "  USB ID",
+            device.usb_id,
+        ),
+        _row(
+            "  Location",
+            location,
+        ),
+        _row(
+            "  USB version",
+            device.usb_version,
+        ),
+        _row(
+            "  Link speed",
+            f"{device.speed_mbps:g} Mb/s" if device.speed_mbps is not None else None,
+        ),
+        _row(
+            "  Device class",
+            (
+                f"{device.device_class} ({device.device_class_name})"
+                if device.device_class and device.device_class_name
+                else device.device_class
+            ),
+        ),
+        _row(
+            "  Kernel drivers",
+            ", ".join(device.drivers) or "none bound",
+        ),
+    ]
+
+    if device.serial_number:
+        lines.append("  Serial:           available in snapshot.json")
+
+    if not device.device_nodes:
+        lines.append("  Device nodes:     none exposed")
+    else:
+        lines.append("  Device nodes:")
+
+        for node in device.device_nodes:
+            owner = ":".join(
+                value or "unknown"
+                for value in (
+                    node.owner,
+                    node.group,
+                )
+            )
+
+            lines.extend(
+                [
+                    _row(
+                        "    Path",
+                        node.path,
+                    ),
+                    _row(
+                        "    Type",
+                        node.node_type,
+                    ),
+                    _row(
+                        "    Permissions",
+                        f"{node.permissions} {owner}",
+                    ),
+                    _row(
+                        "    Current access",
+                        node.access,
+                    ),
+                ]
+            )
+
+    lines.append("")
+
+    return lines
 
 
 def _section(
     title: str,
-    rows: list[tuple[str, str | None]],
+    content: list[str],
+) -> list[str]:
+    return [
+        "",
+        "",
+        title,
+        "─" * _WIDTH,
+        *content,
+    ]
+
+
+def _row(
+    label: str,
+    value: object,
 ) -> str:
-    """Render a simple aligned section."""
+    display = "unavailable" if value is None or value == "" else str(value)
 
-    lines = [title, "-" * 72]
-
-    for label, value in rows:
-        lines.append(f"{label:<20} {_optional(value)}")
-
-    return "\n".join(lines)
+    return f"{label + ':':<20}{display}"
 
 
-def _optional(value: object) -> str:
-    """Render absent values consistently."""
+def _format_bytes(value: int) -> str:
+    amount = float(value)
+    units = (
+        "B",
+        "KiB",
+        "MiB",
+        "GiB",
+        "TiB",
+        "PiB",
+    )
+    unit = units[0]
 
+    for unit in units:
+        if abs(amount) < 1024 or unit == units[-1]:
+            break
+
+        amount /= 1024
+
+    if unit == "B":
+        return f"{int(amount)} {unit}"
+
+    return f"{amount:.2f} {unit}"
+
+
+def _format_optional_bytes(
+    value: int | None,
+) -> str:
     if value is None:
-        return "unknown"
+        return "unavailable"
 
-    text = str(value).strip()
-
-    return text or "unknown"
+    return _format_bytes(value)
 
 
-def _optional_number(value: int | None) -> str:
-    """Render an optional integer."""
+def _format_frequency(
+    value_mhz: float | None,
+) -> str:
+    if value_mhz is None or value_mhz <= 0:
+        return "unavailable"
 
-    return str(value) if value is not None else "unknown"
+    if value_mhz >= 1000:
+        return f"{value_mhz / 1000:.2f} GHz"
+
+    return f"{value_mhz:.0f} MHz"
 
 
-def _yes_no(value: bool) -> str:
-    """Render a boolean as yes or no."""
+def _format_duration(seconds: float) -> str:
+    total = max(0, int(seconds))
+    days, remainder = divmod(total, 86400)
+    hours, remainder = divmod(remainder, 3600)
+    minutes, secs = divmod(remainder, 60)
+
+    parts: list[str] = []
+
+    if days:
+        parts.append(f"{days} day{'s' if days != 1 else ''}")
+
+    if hours:
+        parts.append(f"{hours} hour{'s' if hours != 1 else ''}")
+
+    if minutes:
+        parts.append(f"{minutes} minute{'s' if minutes != 1 else ''}")
+
+    if not parts:
+        parts.append(f"{secs} seconds")
+
+    return ", ".join(parts)
+
+
+def _thermal_health(
+    current: float,
+    critical: float | None,
+) -> str:
+    if critical is not None and current >= critical:
+        return "critical"
+
+    if current >= 80:
+        return "hot"
+
+    return "healthy"
+
+
+def _yes_no(value: bool | None) -> str:
+    if value is None:
+        return "unavailable"
 
     return "yes" if value else "no"
 
 
-def _format_frequency(value: float | None) -> str:
-    """Render a frequency in MHz or GHz."""
+def _abbreviate_secret(
+    value: str | None,
+) -> str:
+    if not value:
+        return "unavailable"
 
-    if value is None:
-        return "unknown"
+    if len(value) <= 12:
+        return value
 
-    if value >= 1000:
-        return f"{value / 1000:.2f} GHz"
-
-    return f"{value:.0f} MHz"
-
-
-def _format_bytes(value: int) -> str:
-    """Render a byte count using binary units."""
-
-    size = float(value)
-
-    for unit in ("B", "KiB", "MiB", "GiB", "TiB", "PiB"):
-        if abs(size) < 1024 or unit == "PiB":
-            return f"{size:.1f} {unit}"
-
-        size /= 1024
-
-    return f"{size:.1f} PiB"
-
-
-def _format_duration(seconds: float) -> str:
-    """Render seconds as days, hours, minutes, and seconds."""
-
-    total_seconds = max(0, int(seconds))
-    days, remainder = divmod(total_seconds, 86_400)
-    hours, remainder = divmod(remainder, 3_600)
-    minutes, remaining_seconds = divmod(remainder, 60)
-
-    values: list[str] = []
-
-    if days:
-        values.append(f"{days}d")
-
-    if hours or days:
-        values.append(f"{hours}h")
-
-    if minutes or hours or days:
-        values.append(f"{minutes}m")
-
-    values.append(f"{remaining_seconds}s")
-
-    return " ".join(values)
-
-
-def main() -> None:
-    """Run the Screwdriver CLI."""
-
-    app()
+    return f"{value[:8]}…{value[-4:]}"
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
