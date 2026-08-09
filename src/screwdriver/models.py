@@ -481,6 +481,59 @@ class USBDevice:
 
 
 @dataclass(slots=True)
+class SerialDevice:
+    """Describe one hardware-backed Linux serial/TTY port."""
+
+    port: str
+    sysfs_name: str
+    transport: str
+    driver: str | None = None
+    stable_id_path: str | None = None
+    physical_path: str | None = None
+    usb_vendor_id: str | None = None
+    usb_product_id: str | None = None
+    manufacturer: str | None = None
+    product_name: str | None = None
+    serial_number: str | None = None
+    device_node: DeviceNode | None = None
+
+    @property
+    def usb_id(self) -> str | None:
+        if self.usb_vendor_id is None or self.usb_product_id is None:
+            return None
+
+        return f"{self.usb_vendor_id}:{self.usb_product_id}"
+
+    @property
+    def display_name(self) -> str:
+        name = " ".join(part for part in (self.manufacturer, self.product_name) if part)
+        return name or self.sysfs_name
+
+    @property
+    def stable_path_available(self) -> bool:
+        return self.stable_id_path is not None
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "port": self.port,
+            "sysfs_name": self.sysfs_name,
+            "transport": self.transport,
+            "driver": self.driver,
+            "stable_id_path": self.stable_id_path,
+            "physical_path": self.physical_path,
+            "stable_path_available": self.stable_path_available,
+            "usb_id": self.usb_id,
+            "usb_vendor_id": self.usb_vendor_id,
+            "usb_product_id": self.usb_product_id,
+            "manufacturer": self.manufacturer,
+            "product_name": self.product_name,
+            "display_name": self.display_name,
+            "serial_number": self.serial_number,
+            "device_node": self.device_node.to_dict() if self.device_node else None,
+        }
+
+
+@dataclass(slots=True)
 class SystemSnapshot:
     """Represent a complete passive inspection of one Linux computer."""
 
@@ -495,6 +548,7 @@ class SystemSnapshot:
     power: PowerInfo
     network: NetworkInfo
     usb_devices: list[USBDevice] = field(default_factory=list)
+    serial_devices: list[SerialDevice] = field(default_factory=list)
     schema_version: str = "2.0"
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     components: list[Component] = field(default_factory=list)
@@ -515,6 +569,7 @@ class SystemSnapshot:
             "power": self.power.to_dict(),
             "network": self.network.to_dict(),
             "usb_devices": [device.to_dict() for device in self.usb_devices],
+            "serial_devices": [device.to_dict() for device in self.serial_devices],
             "components": [component.to_dict() for component in self.components],
             "findings": [finding.to_dict() for finding in self.findings],
         }

@@ -19,6 +19,7 @@ from screwdriver.models import (
     OperatingSystemInfo,
     PlatformInfo,
     PowerInfo,
+    SerialDevice,
     SystemSnapshot,
     USBDevice,
 )
@@ -45,7 +46,12 @@ def _snapshot() -> SystemSnapshot:
             init_system="systemd",
             package_manager="apt",
             timezone="UTC",
-            boot_time=datetime(2026, 8, 9, tzinfo=UTC),
+            boot_time=datetime(
+                2026,
+                8,
+                9,
+                tzinfo=UTC,
+            ),
             uptime_seconds=3600,
             process_count=100,
         ),
@@ -90,7 +96,7 @@ def _snapshot() -> SystemSnapshot:
                     name="eth0",
                     interface_type="ethernet",
                     ipv4_addresses=["192.168.10.25/24"],
-                    mac_address="00:11:22:33:44:55",
+                    mac_address=("00:11:22:33:44:55"),
                     state="up",
                     is_default_route=True,
                 )
@@ -122,11 +128,34 @@ def _snapshot() -> SystemSnapshot:
                 ],
             )
         ],
+        serial_devices=[
+            SerialDevice(
+                port="/dev/ttyUSB0",
+                sysfs_name="ttyUSB0",
+                transport="usb-serial",
+                driver="cp210x",
+                stable_id_path=("/dev/serial/by-id/usb-Silicon_Labs_CP2102N_bridge-123"),
+                usb_vendor_id="10c4",
+                usb_product_id="ea60",
+                manufacturer="Silicon Labs",
+                product_name=("CP2102N USB to UART Bridge"),
+                serial_number="bridge-123",
+                device_node=DeviceNode(
+                    path="/dev/ttyUSB0",
+                    node_type="character",
+                    permissions="crw-rw----",
+                    owner="root",
+                    group="dialout",
+                    readable=True,
+                    writable=True,
+                ),
+            )
+        ],
         findings=[
             Finding(
                 code="HOST_RESOURCES_HEALTHY",
                 severity=FindingSeverity.INFO,
-                summary="No host-resource warnings were detected.",
+                summary=("No host-resource warnings were detected."),
             )
         ],
     )
@@ -140,7 +169,16 @@ def test_inspect_defaults_to_local_and_writes_all_reports(
         "screwdriver.cli.collect_host",
         return_value=_snapshot(),
     ):
-        assert main(["inspect", "--output", str(tmp_path)]) == 0
+        assert (
+            main(
+                [
+                    "inspect",
+                    "--output",
+                    str(tmp_path),
+                ]
+            )
+            == 0
+        )
 
     output = capsys.readouterr().out
 
@@ -153,6 +191,11 @@ def test_inspect_defaults_to_local_and_writes_all_reports(
     assert "USB ID:           046d:094c" in output
     assert "Kernel drivers:   uvcvideo" in output
     assert "Access:           read-write" in output
+    assert "Probe safety:    PASSIVE" in output
+    assert "SERIAL / TTY DIAGNOSTICS" in output
+    assert "Serial device 1: Silicon Labs CP2102N USB to UART Bridge" in output
+    assert "Port:             /dev/ttyUSB0" in output
+    assert "Stable by-id:     /dev/serial/by-id/usb-Silicon_Labs" in output
     assert "Device nodes" not in output
     assert "/dev/video0" not in output
     assert "crw-rw----" not in output
@@ -172,6 +215,9 @@ def test_inspect_defaults_to_local_and_writes_all_reports(
     assert "/dev/video0" in html_report
     assert "crw-rw----" in html_report
     assert "USB device-node details" in html_report
+    assert "Serial / TTY details" in html_report
+    assert "/dev/ttyUSB0" in html_report
+    assert '"serial_devices"' in snapshot_json
     assert "/dev/video0" not in text_report
 
 
@@ -196,6 +242,7 @@ def test_agentic_mode_is_honest_about_current_scope(
         )
 
     output = capsys.readouterr().out
+
     assert "Inspection mode: agentic" in output
     assert "agent reasoning not implemented yet" in output
 
@@ -216,6 +263,11 @@ def test_focus_requires_agentic_mode() -> None:
 
 def test_analyze_command_was_removed() -> None:
     with pytest.raises(SystemExit) as error:
-        main(["analyze", "snapshot.json"])
+        main(
+            [
+                "analyze",
+                "snapshot.json",
+            ]
+        )
 
     assert error.value.code == 2

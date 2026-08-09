@@ -52,6 +52,7 @@ def save_reports(
                 f"hostname={snapshot.identity.hostname}",
                 f"schema_version={snapshot.schema_version}",
                 f"usb_devices={len(snapshot.usb_devices)}",
+                f"serial_devices={len(snapshot.serial_devices)}",
                 f"findings={len(snapshot.findings)}",
                 "inspection_mode=passive",
                 "state_changed=false",
@@ -84,12 +85,14 @@ def _build_html_report(
     title = html.escape(f"Screwdriver report — {snapshot.identity.hostname}")
     content = html.escape(report)
     usb_details = _build_usb_details(snapshot)
+    serial_details = _build_serial_details(snapshot)
 
     return f"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
   <title>{title}</title>
   <style>
     :root {{ color-scheme: light dark; }}
@@ -98,7 +101,11 @@ def _build_html_report(
       margin: 0;
       background: #0b1020;
       color: #e8edf7;
-      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-family:
+        ui-monospace,
+        SFMono-Regular,
+        Consolas,
+        monospace;
     }}
 
     main {{
@@ -145,20 +152,29 @@ def _build_html_report(
   <main>
     <pre>{content}</pre>
     {usb_details}
+    {serial_details}
   </main>
 </body>
 </html>
 """
 
 
-def _build_usb_details(snapshot: SystemSnapshot) -> str:
+def _build_usb_details(
+    snapshot: SystemSnapshot,
+) -> str:
     """Render detailed USB device-node evidence for HTML only."""
 
     rows: list[str] = []
 
     for device in snapshot.usb_devices:
         for node in device.device_nodes:
-            owner = ":".join(value or "unknown" for value in (node.owner, node.group))
+            owner = ":".join(
+                value or "unknown"
+                for value in (
+                    node.owner,
+                    node.group,
+                )
+            )
 
             values = (
                 device.display_name,
@@ -191,6 +207,57 @@ def _build_usb_details(snapshot: SystemSnapshot) -> str:
         <th>Type</th>
         <th>Permissions</th>
         <th>Owner</th>
+        <th>Current access</th>
+      </tr>
+    </thead>
+    <tbody>
+      {body}
+    </tbody>
+  </table>
+</section>
+"""
+
+
+def _build_serial_details(
+    snapshot: SystemSnapshot,
+) -> str:
+    """Render detailed serial identity and access evidence for HTML."""
+
+    rows: list[str] = []
+
+    for device in snapshot.serial_devices:
+        node = device.device_node
+        values = (
+            device.display_name,
+            device.port,
+            device.transport,
+            device.driver or "unbound",
+            device.usb_id or "not USB",
+            device.stable_id_path or "not available",
+            node.permissions if node else "missing",
+            node.access if node else "missing",
+        )
+        cells = "".join(f"<td>{html.escape(value)}</td>" for value in values)
+        rows.append(f"<tr>{cells}</tr>")
+
+    if not rows:
+        return ""
+
+    body = "".join(rows)
+
+    return f"""
+<section>
+  <h2>Serial / TTY details</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Device</th>
+        <th>Port</th>
+        <th>Transport</th>
+        <th>Driver</th>
+        <th>USB ID</th>
+        <th>Stable by-id path</th>
+        <th>Permissions</th>
         <th>Current access</th>
       </tr>
     </thead>
