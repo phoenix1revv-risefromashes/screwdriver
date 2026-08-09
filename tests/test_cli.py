@@ -32,10 +32,7 @@ def _snapshot() -> SystemSnapshot:
             effective_username="phoenix",
             uid=1000,
             gid=1000,
-            groups=[
-                "dialout",
-                "video",
-            ],
+            groups=["dialout", "video"],
             login_shell="/bin/bash",
             machine_id="1234567890abcdef",
         ),
@@ -48,12 +45,7 @@ def _snapshot() -> SystemSnapshot:
             init_system="systemd",
             package_manager="apt",
             timezone="UTC",
-            boot_time=datetime(
-                2026,
-                8,
-                9,
-                tzinfo=UTC,
-            ),
+            boot_time=datetime(2026, 8, 9, tzinfo=UTC),
             uptime_seconds=3600,
             process_count=100,
         ),
@@ -71,11 +63,7 @@ def _snapshot() -> SystemSnapshot:
             minimum_frequency_mhz=500,
             maximum_frequency_mhz=2500,
             usage_percent=10,
-            load_average=(
-                0.1,
-                0.2,
-                0.3,
-            ),
+            load_average=(0.1, 0.2, 0.3),
             governor="schedutil",
         ),
         memory=MemoryInfo(
@@ -101,9 +89,7 @@ def _snapshot() -> SystemSnapshot:
                 NetworkInterface(
                     name="eth0",
                     interface_type="ethernet",
-                    ipv4_addresses=[
-                        "192.168.10.25/24",
-                    ],
+                    ipv4_addresses=["192.168.10.25/24"],
                     mac_address="00:11:22:33:44:55",
                     state="up",
                     is_default_route=True,
@@ -140,7 +126,7 @@ def _snapshot() -> SystemSnapshot:
             Finding(
                 code="HOST_RESOURCES_HEALTHY",
                 severity=FindingSeverity.INFO,
-                summary=("No host-resource warnings were detected."),
+                summary="No host-resource warnings were detected.",
             )
         ],
     )
@@ -154,16 +140,7 @@ def test_inspect_defaults_to_local_and_writes_all_reports(
         "screwdriver.cli.collect_host",
         return_value=_snapshot(),
     ):
-        assert (
-            main(
-                [
-                    "inspect",
-                    "--output",
-                    str(tmp_path),
-                ]
-            )
-            == 0
-        )
+        assert main(["inspect", "--output", str(tmp_path)]) == 0
 
     output = capsys.readouterr().out
 
@@ -175,13 +152,27 @@ def test_inspect_defaults_to_local_and_writes_all_reports(
     assert "USB device 1: Logitech Brio 100" in output
     assert "USB ID:           046d:094c" in output
     assert "Kernel drivers:   uvcvideo" in output
-    assert "Current access: read-write" in output
+    assert "Access:           read-write" in output
+    assert "Device nodes" not in output
+    assert "/dev/video0" not in output
+    assert "crw-rw----" not in output
     assert "analyze" not in output
 
     assert (tmp_path / "snapshot.json").is_file()
     assert (tmp_path / "report.txt").is_file()
     assert (tmp_path / "report.html").is_file()
     assert (tmp_path / "inspection.log").is_file()
+
+    snapshot_json = (tmp_path / "snapshot.json").read_text(encoding="utf-8")
+    html_report = (tmp_path / "report.html").read_text(encoding="utf-8")
+    text_report = (tmp_path / "report.txt").read_text(encoding="utf-8")
+
+    assert "/dev/video0" in snapshot_json
+    assert '"permissions": "crw-rw----"' in snapshot_json
+    assert "/dev/video0" in html_report
+    assert "crw-rw----" in html_report
+    assert "USB device-node details" in html_report
+    assert "/dev/video0" not in text_report
 
 
 def test_agentic_mode_is_honest_about_current_scope(
@@ -205,7 +196,6 @@ def test_agentic_mode_is_honest_about_current_scope(
         )
 
     output = capsys.readouterr().out
-
     assert "Inspection mode: agentic" in output
     assert "agent reasoning not implemented yet" in output
 
@@ -226,11 +216,6 @@ def test_focus_requires_agentic_mode() -> None:
 
 def test_analyze_command_was_removed() -> None:
     with pytest.raises(SystemExit) as error:
-        main(
-            [
-                "analyze",
-                "snapshot.json",
-            ]
-        )
+        main(["analyze", "snapshot.json"])
 
     assert error.value.code == 2

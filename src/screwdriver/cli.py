@@ -29,8 +29,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command")
     inspect_parser = subparsers.add_parser(
-        "inspect",
-        help="Inspect the local computer without changing device state.",
+        "inspect", help="Inspect the local computer without changing device state."
     )
     modes = inspect_parser.add_mutually_exclusive_group()
     modes.add_argument(
@@ -61,17 +60,13 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     parser = build_parser()
     args = parser.parse_args(argv)
-
     if args.command is None:
         parser.print_help()
         return 0
-
     if args.command == "inspect":
         if args.focus and not args.agentic:
             parser.error("--focus can only be used with --agentic")
-
         return _run_inspect(args)
-
     parser.error(f"Unknown command: {args.command}")
     return 2
 
@@ -81,13 +76,10 @@ def _run_inspect(args: argparse.Namespace) -> int:
 
     started_monotonic = time.monotonic()
     started_at = datetime.now(UTC)
-
     snapshot = collect_host()
-
     duration = time.monotonic() - started_monotonic
     mode = "agentic" if args.agentic else "local"
     paths = build_report_paths(args.output)
-
     report = format_snapshot(
         snapshot,
         mode=mode,
@@ -96,10 +88,8 @@ def _run_inspect(args: argparse.Namespace) -> int:
         paths=paths,
         focus=args.focus,
     )
-
     save_reports(snapshot, report, args.output)
     print(report)
-
     return 0
 
 
@@ -171,14 +161,8 @@ def format_snapshot(
                     "Boot time",
                     operating_system.boot_time.strftime("%Y-%m-%d %H:%M:%S UTC"),
                 ),
-                _row(
-                    "Uptime",
-                    _format_duration(operating_system.uptime_seconds),
-                ),
-                _row(
-                    "Running processes",
-                    operating_system.process_count,
-                ),
+                _row("Uptime", _format_duration(operating_system.uptime_seconds)),
+                _row("Running processes", operating_system.process_count),
             ],
         )
     )
@@ -194,15 +178,9 @@ def format_snapshot(
                 _row("Board revision", platform_info.board_version),
                 _row("Firmware", platform_info.firmware_version),
                 _row("Machine type", platform_info.machine_type),
-                _row(
-                    "Virtualization",
-                    platform_info.virtualization or "none detected",
-                ),
+                _row("Virtualization", platform_info.virtualization or "none detected"),
                 _row("Platform family", platform_info.family),
-                _row(
-                    "Enrichment module",
-                    platform_info.enrichment_module or "none",
-                ),
+                _row("Enrichment module", platform_info.enrichment_module or "none"),
                 "Serial number:     available in snapshot.json"
                 if platform_info.serial_number
                 else "Serial number:     not reported by platform",
@@ -212,13 +190,9 @@ def format_snapshot(
 
     if platform_info.details:
         detail_lines = [
-            _row(
-                key.replace("_", " ").title(),
-                value,
-            )
+            _row(key.replace("_", " ").title(), value)
             for key, value in platform_info.details.items()
         ]
-
         lines.extend(
             _section(
                 f"PLATFORM-SPECIFIC DETAILS — {platform_info.family.upper()}",
@@ -234,18 +208,9 @@ def format_snapshot(
         _row("Physical cores", cpu.physical_cores),
         _row("Logical CPUs", cpu.logical_cpus),
         _row("Online CPUs", cpu.online_cpus),
-        _row(
-            "Current frequency",
-            _format_frequency(cpu.current_frequency_mhz),
-        ),
-        _row(
-            "Minimum frequency",
-            _format_frequency(cpu.minimum_frequency_mhz),
-        ),
-        _row(
-            "Maximum frequency",
-            _format_frequency(cpu.maximum_frequency_mhz),
-        ),
+        _row("Current frequency", _format_frequency(cpu.current_frequency_mhz)),
+        _row("Minimum frequency", _format_frequency(cpu.minimum_frequency_mhz)),
+        _row("Maximum frequency", _format_frequency(cpu.maximum_frequency_mhz)),
         _row("CPU usage", f"{cpu.usage_percent:.1f}%"),
         _row(
             "Load average",
@@ -253,15 +218,7 @@ def format_snapshot(
         ),
         _row("Governor", cpu.governor),
     ]
-
-    cpu_lines.extend(
-        _row(
-            f"Cache {name}",
-            value,
-        )
-        for name, value in cpu.caches.items()
-    )
-
+    cpu_lines.extend(_row(f"Cache {name}", value) for name, value in cpu.caches.items())
     lines.extend(_section("CPU", cpu_lines))
 
     memory = snapshot.memory
@@ -270,44 +227,17 @@ def format_snapshot(
             "MEMORY",
             [
                 "Physical memory:",
-                _row(
-                    "  Total",
-                    _format_bytes(memory.total_bytes),
-                ),
-                _row(
-                    "  Used",
-                    _format_bytes(memory.used_bytes),
-                ),
-                _row(
-                    "  Available",
-                    _format_bytes(memory.available_bytes),
-                ),
-                _row(
-                    "  Usage",
-                    f"{memory.usage_percent:.1f}%",
-                ),
-                _row(
-                    "  Shared",
-                    _format_bytes(memory.shared_bytes),
-                ),
+                _row("  Total", _format_bytes(memory.total_bytes)),
+                _row("  Used", _format_bytes(memory.used_bytes)),
+                _row("  Available", _format_bytes(memory.available_bytes)),
+                _row("  Usage", f"{memory.usage_percent:.1f}%"),
+                _row("  Shared", _format_bytes(memory.shared_bytes)),
                 "",
                 "Swap:",
-                _row(
-                    "  Total",
-                    _format_bytes(memory.swap_total_bytes),
-                ),
-                _row(
-                    "  Used",
-                    _format_bytes(memory.swap_used_bytes),
-                ),
-                _row(
-                    "  Available",
-                    _format_bytes(memory.swap_free_bytes),
-                ),
-                _row(
-                    "  Usage",
-                    f"{memory.swap_usage_percent:.1f}%",
-                ),
+                _row("  Total", _format_bytes(memory.swap_total_bytes)),
+                _row("  Used", _format_bytes(memory.swap_used_bytes)),
+                _row("  Available", _format_bytes(memory.swap_free_bytes)),
+                _row("  Usage", f"{memory.swap_usage_percent:.1f}%"),
             ],
         )
     )
@@ -324,10 +254,7 @@ def format_snapshot(
                 _row("  Model", device.model),
                 _row("  Connection", device.connection),
                 _row("  Media type", device.media_type),
-                _row(
-                    "  Capacity",
-                    _format_bytes(device.capacity_bytes),
-                ),
+                _row("  Capacity", _format_bytes(device.capacity_bytes)),
                 _row("  Firmware", device.firmware_version),
                 _row("  Removable", _yes_no(device.removable)),
                 _row("  Read-only", _yes_no(device.read_only)),
@@ -344,14 +271,8 @@ def format_snapshot(
             storage_lines.extend(
                 [
                     f"    {partition.path}",
-                    _row(
-                        "      Filesystem",
-                        partition.filesystem,
-                    ),
-                    _row(
-                        "      Mount point",
-                        partition.mount_point or "not mounted",
-                    ),
+                    _row("      Filesystem", partition.filesystem),
+                    _row("      Mount point", partition.mount_point or "not mounted"),
                     _row(
                         "      Capacity",
                         _format_optional_bytes(partition.total_bytes),
@@ -375,12 +296,7 @@ def format_snapshot(
 
         storage_lines.append("")
 
-    lines.extend(
-        _section(
-            "STORAGE DEVICES",
-            storage_lines,
-        )
-    )
+    lines.extend(_section("STORAGE DEVICES", storage_lines))
 
     gpu_lines: list[str] = []
 
@@ -395,10 +311,7 @@ def format_snapshot(
                 _row("  Model", gpu.model),
                 _row("  Driver", gpu.driver),
                 _row("  Bus ID", gpu.bus_id),
-                _row(
-                    "  Memory",
-                    _format_optional_bytes(gpu.memory_bytes),
-                ),
+                _row("  Memory", _format_optional_bytes(gpu.memory_bytes)),
                 _row(
                     "  Usage",
                     f"{gpu.usage_percent:.1f}%" if gpu.usage_percent is not None else None,
@@ -413,12 +326,7 @@ def format_snapshot(
             ]
         )
 
-    lines.extend(
-        _section(
-            "GRAPHICS AND COMPUTE ACCELERATORS",
-            gpu_lines,
-        )
-    )
+    lines.extend(_section("GRAPHICS AND COMPUTE ACCELERATORS", gpu_lines))
 
     thermal_lines: list[str] = []
 
@@ -430,28 +338,14 @@ def format_snapshot(
             sensor.temperature_celsius,
             sensor.critical_celsius,
         )
+        thermal_lines.append(_row(sensor.name, f"{sensor.temperature_celsius:.1f}°C  {health}"))
 
-        thermal_lines.append(
-            _row(
-                sensor.name,
-                f"{sensor.temperature_celsius:.1f}°C  {health}",
-            )
-        )
-
-    lines.extend(
-        _section(
-            "THERMAL AND COOLING",
-            thermal_lines,
-        )
-    )
+    lines.extend(_section("THERMAL AND COOLING", thermal_lines))
 
     power = snapshot.power
     power_lines = [
         _row("Power source", power.source),
-        _row(
-            "Battery detected",
-            _yes_no(power.battery_present),
-        ),
+        _row("Battery detected", _yes_no(power.battery_present)),
     ]
 
     if power.battery_present:
@@ -461,10 +355,7 @@ def format_snapshot(
                     "Battery level",
                     f"{power.battery_percent:.1f}%" if power.battery_percent is not None else None,
                 ),
-                _row(
-                    "Charging / plugged",
-                    _yes_no(power.charging),
-                ),
+                _row("Charging / plugged", _yes_no(power.charging)),
                 _row(
                     "Time remaining",
                     _format_duration(power.seconds_remaining)
@@ -475,29 +366,15 @@ def format_snapshot(
         )
 
     power_lines.extend(
-        _row(
-            key.replace("_", " ").title(),
-            value,
-        )
-        for key, value in power.details.items()
+        _row(key.replace("_", " ").title(), value) for key, value in power.details.items()
     )
-
     lines.extend(_section("POWER", power_lines))
 
     network = snapshot.network
     network_lines = [
-        _row(
-            "Default route",
-            network.default_interface,
-        ),
-        _row(
-            "Gateway",
-            network.default_gateway,
-        ),
-        _row(
-            "DNS servers",
-            ", ".join(network.dns_servers) or "none",
-        ),
+        _row("Default route", network.default_interface),
+        _row("Gateway", network.default_gateway),
+        _row("DNS servers", ", ".join(network.dns_servers) or "none"),
         _row(
             "Internet route",
             "available" if network.internet_route_available else "not detected",
@@ -510,7 +387,6 @@ def format_snapshot(
         for interface in network.interfaces
         if not interface.is_loopback and not interface.is_virtual
     ]
-
     hidden_interfaces = [
         interface for interface in network.interfaces if interface not in visible_interfaces
     ]
@@ -524,7 +400,7 @@ def format_snapshot(
     network_lines.extend(
         [
             "IPv6:              excluded by output preference",
-            (f"Virtual interfaces: {len(hidden_interfaces)} detected, hidden from summary"),
+            f"Virtual interfaces: {len(hidden_interfaces)} detected, hidden from summary",
         ]
     )
 
@@ -541,23 +417,10 @@ def format_snapshot(
     if not snapshot.usb_devices:
         usb_lines.append("No USB devices were exposed through sysfs.")
 
-    for index, usb_device in enumerate(
-        snapshot.usb_devices,
-        start=1,
-    ):
-        usb_lines.extend(
-            _format_usb_device(
-                usb_device,
-                index,
-            )
-        )
+    for index, usb_device in enumerate(snapshot.usb_devices, start=1):
+        usb_lines.extend(_format_usb_device(usb_device, index))
 
-    lines.extend(
-        _section(
-            "USB HARDWARE INVENTORY",
-            usb_lines,
-        )
-    )
+    lines.extend(_section("USB HARDWARE INVENTORY", usb_lines))
 
     severity_counts = {
         severity: sum(finding.severity is severity for finding in snapshot.findings)
@@ -574,18 +437,9 @@ def format_snapshot(
 
     summary_lines = [
         _row("Overall status", overall),
-        _row(
-            "Warnings",
-            severity_counts[FindingSeverity.WARNING],
-        ),
-        _row(
-            "Errors",
-            severity_counts[FindingSeverity.ERROR],
-        ),
-        _row(
-            "Informational",
-            severity_counts[FindingSeverity.INFO],
-        ),
+        _row("Warnings", severity_counts[FindingSeverity.WARNING]),
+        _row("Errors", severity_counts[FindingSeverity.ERROR]),
+        _row("Informational", severity_counts[FindingSeverity.INFO]),
         "",
     ]
 
@@ -598,35 +452,15 @@ def format_snapshot(
         if finding.recommendation:
             summary_lines.append(f"       Recommendation: {finding.recommendation}")
 
-    lines.extend(
-        _section(
-            "DIAGNOSTIC SUMMARY",
-            summary_lines,
-        )
-    )
+    lines.extend(_section("DIAGNOSTIC SUMMARY", summary_lines))
 
     report_lines = [
-        _row(
-            "Snapshot",
-            paths.snapshot if paths else "pending",
-        ),
-        _row(
-            "Terminal report",
-            paths.text_report if paths else "pending",
-        ),
-        _row(
-            "HTML report",
-            paths.html_report if paths else "pending",
-        ),
-        _row(
-            "Diagnostic log",
-            paths.diagnostic_log if paths else "pending",
-        ),
+        _row("Snapshot", paths.snapshot if paths else "pending"),
+        _row("Terminal report", paths.text_report if paths else "pending"),
+        _row("HTML report", paths.html_report if paths else "pending"),
+        _row("Diagnostic log", paths.diagnostic_log if paths else "pending"),
         "",
-        _row(
-            "Duration",
-            f"{duration:.2f} seconds",
-        ),
+        _row("Duration", f"{duration:.2f} seconds"),
         _row(
             "Completed",
             datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC"),
@@ -636,78 +470,39 @@ def format_snapshot(
     ]
 
     lines.extend(_section("REPORTS", report_lines))
-
     return "\n".join(lines).rstrip()
 
 
-def _format_network_interface(
-    interface: NetworkInterface,
-) -> list[str]:
+def _format_network_interface(interface: NetworkInterface) -> list[str]:
     return [
-        _row(
-            "Interface",
-            interface.name,
-        ),
-        _row(
-            "  Type",
-            interface.interface_type,
-        ),
-        _row(
-            "  State",
-            interface.state,
-        ),
-        _row(
-            "  IPv4",
-            ", ".join(interface.ipv4_addresses) or "none",
-        ),
-        _row(
-            "  MAC",
-            interface.mac_address,
-        ),
+        _row("Interface", interface.name),
+        _row("  Type", interface.interface_type),
+        _row("  State", interface.state),
+        _row("  IPv4", ", ".join(interface.ipv4_addresses) or "none"),
+        _row("  MAC", interface.mac_address),
         _row(
             "  Link speed",
             f"{interface.speed_mbps:,} Mb/s" if interface.speed_mbps is not None else None,
         ),
-        _row(
-            "  Duplex",
-            interface.duplex,
-        ),
-        _row(
-            "  Driver",
-            interface.driver,
-        ),
-        _row(
-            "  Default route",
-            _yes_no(interface.is_default_route),
-        ),
+        _row("  Duplex", interface.duplex),
+        _row("  Driver", interface.driver),
+        _row("  Default route", _yes_no(interface.is_default_route)),
         "",
     ]
 
 
-def _format_usb_device(
-    device: USBDevice,
-    index: int,
-) -> list[str]:
+def _format_usb_device(device: USBDevice, index: int) -> list[str]:
     location = (
-        (f"bus {device.bus_number:03d}, device {device.device_number:03d}")
+        f"bus {device.bus_number:03d}, device {device.device_number:03d}"
         if device.bus_number is not None and device.device_number is not None
         else device.sysfs_name
     )
 
     lines = [
         f"USB device {index}: {device.display_name}",
-        _row(
-            "  USB ID",
-            device.usb_id,
-        ),
-        _row(
-            "  Location",
-            location,
-        ),
-        _row(
-            "  USB version",
-            device.usb_version,
-        ),
+        _row("  USB ID", device.usb_id),
+        _row("  Location", location),
+        _row("  USB version", device.usb_version),
         _row(
             "  Link speed",
             f"{device.speed_mbps:g} Mb/s" if device.speed_mbps is not None else None,
@@ -729,84 +524,34 @@ def _format_usb_device(
     if device.serial_number:
         lines.append("  Serial:           available in snapshot.json")
 
-    if not device.device_nodes:
-        lines.append("  Device nodes:     none exposed")
-    else:
-        lines.append("  Device nodes:")
-
-        for node in device.device_nodes:
-            owner = ":".join(
-                value or "unknown"
-                for value in (
-                    node.owner,
-                    node.group,
-                )
-            )
-
-            lines.extend(
-                [
-                    _row(
-                        "    Path",
-                        node.path,
-                    ),
-                    _row(
-                        "    Type",
-                        node.node_type,
-                    ),
-                    _row(
-                        "    Permissions",
-                        f"{node.permissions} {owner}",
-                    ),
-                    _row(
-                        "    Current access",
-                        node.access,
-                    ),
-                ]
-            )
+    if device.device_nodes:
+        access_levels = sorted({node.access for node in device.device_nodes})
+        access = (
+            access_levels[0] if len(access_levels) == 1 else f"mixed ({', '.join(access_levels)})"
+        )
+        lines.append(_row("  Access", access))
 
     lines.append("")
-
     return lines
 
 
-def _section(
-    title: str,
-    content: list[str],
-) -> list[str]:
-    return [
-        "",
-        "",
-        title,
-        "─" * _WIDTH,
-        *content,
-    ]
+def _section(title: str, content: list[str]) -> list[str]:
+    return ["", "", title, "─" * _WIDTH, *content]
 
 
-def _row(
-    label: str,
-    value: object,
-) -> str:
+def _row(label: str, value: object) -> str:
     display = "unavailable" if value is None or value == "" else str(value)
-
     return f"{label + ':':<20}{display}"
 
 
 def _format_bytes(value: int) -> str:
     amount = float(value)
-    units = (
-        "B",
-        "KiB",
-        "MiB",
-        "GiB",
-        "TiB",
-        "PiB",
-    )
+    units = ("B", "KiB", "MiB", "GiB", "TiB", "PiB")
     unit = units[0]
 
     for unit in units:
         if abs(amount) < 1024 or unit == units[-1]:
             break
-
         amount /= 1024
 
     if unit == "B":
@@ -815,18 +560,11 @@ def _format_bytes(value: int) -> str:
     return f"{amount:.2f} {unit}"
 
 
-def _format_optional_bytes(
-    value: int | None,
-) -> str:
-    if value is None:
-        return "unavailable"
-
-    return _format_bytes(value)
+def _format_optional_bytes(value: int | None) -> str:
+    return _format_bytes(value) if value is not None else "unavailable"
 
 
-def _format_frequency(
-    value_mhz: float | None,
-) -> str:
+def _format_frequency(value_mhz: float | None) -> str:
     if value_mhz is None or value_mhz <= 0:
         return "unavailable"
 
@@ -841,7 +579,6 @@ def _format_duration(seconds: float) -> str:
     days, remainder = divmod(total, 86400)
     hours, remainder = divmod(remainder, 3600)
     minutes, secs = divmod(remainder, 60)
-
     parts: list[str] = []
 
     if days:
@@ -859,10 +596,7 @@ def _format_duration(seconds: float) -> str:
     return ", ".join(parts)
 
 
-def _thermal_health(
-    current: float,
-    critical: float | None,
-) -> str:
+def _thermal_health(current: float, critical: float | None) -> str:
     if critical is not None and current >= critical:
         return "critical"
 
@@ -879,9 +613,7 @@ def _yes_no(value: bool | None) -> str:
     return "yes" if value else "no"
 
 
-def _abbreviate_secret(
-    value: str | None,
-) -> str:
+def _abbreviate_secret(value: str | None) -> str:
     if not value:
         return "unavailable"
 

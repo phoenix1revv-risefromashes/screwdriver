@@ -14,9 +14,7 @@ from screwdriver.models import DeviceNode, USBDevice
 
 _SYSFS_USB_ROOT = Path("/sys/bus/usb/devices")
 _DEV_ROOT = Path("/dev")
-
 _USB_ID_PATTERN = re.compile(r"^[0-9a-fA-F]{4}$")
-
 _USB_CLASS_NAMES = {
     "00": "defined at interface level",
     "01": "audio",
@@ -64,7 +62,7 @@ def collect_usb_devices(
             continue
 
         interfaces = _find_interfaces(sysfs_root, entry.name)
-        drivers = _collect_driver_names(entry, interfaces)
+        driver_names = _collect_driver_names(entry, interfaces)
         device_nodes = _collect_device_nodes(
             entry,
             interfaces,
@@ -86,7 +84,7 @@ def collect_usb_devices(
                 speed_mbps=_read_float(entry / "speed"),
                 device_class=class_code,
                 device_class_name=_USB_CLASS_NAMES.get(class_code or ""),
-                drivers=drivers,
+                drivers=driver_names,
                 device_nodes=device_nodes,
             )
         )
@@ -137,14 +135,27 @@ def _collect_device_nodes(
 ) -> list[DeviceNode]:
     major_minor_pairs: set[tuple[int, int]] = set()
 
-    for path in (device, *interfaces):
+    try:
+        resolved_device = device.resolve(strict=True)
+    except OSError:
+        resolved_device = None
+
+    if resolved_device is not None:
+        pair = _parse_major_minor(_read_text(resolved_device / "dev"))
+
+        if pair is not None:
+            major_minor_pairs.add(pair)
+
+    for interface in interfaces:
         try:
-            resolved = path.resolve(strict=True)
+            resolved_interface = interface.resolve(strict=True)
         except OSError:
             continue
 
         try:
-            for dev_file in resolved.rglob("dev"):
+            dev_files = resolved_interface.rglob("dev")
+
+            for dev_file in dev_files:
                 pair = _parse_major_minor(_read_text(dev_file))
 
                 if pair is not None:
@@ -166,10 +177,7 @@ def _collect_device_nodes(
             if node is not None:
                 nodes.append(node)
 
-    return sorted(
-        nodes,
-        key=lambda node: node.path,
-    )
+    return sorted(nodes, key=lambda node: node.path)
 
 
 def _build_device_node_index(
@@ -178,10 +186,9 @@ def _build_device_node_index(
     index: dict[tuple[int, int], list[Path]] = {}
 
     try:
-        for directory, _, filenames in os.walk(
-            dev_root,
-            followlinks=False,
-        ):
+        walker = os.walk(dev_root, followlinks=False)
+
+        for directory, _, filenames in walker:
             for filename in filenames:
                 path = Path(directory) / filename
 
@@ -204,9 +211,7 @@ def _build_device_node_index(
     return index
 
 
-def _describe_device_node(
-    path: Path,
-) -> DeviceNode | None:
+def _describe_device_node(path: Path) -> DeviceNode | None:
     try:
         metadata = path.stat()
     except OSError:
@@ -228,7 +233,10 @@ def _describe_device_node(
 def _read_usb_id(path: Path) -> str | None:
     value = _read_text(path)
 
-    if value is None or _USB_ID_PATTERN.fullmatch(value) is None:
+    if value is None:
+        return None
+
+    if _USB_ID_PATTERN.fullmatch(value) is None:
         return None
 
     return value.lower()
@@ -237,7 +245,10 @@ def _read_usb_id(path: Path) -> str | None:
 def _read_usb_class(path: Path) -> str | None:
     value = _read_text(path)
 
-    if value is None or re.fullmatch(r"[0-9a-fA-F]{2}", value) is None:
+    if value is None:
+        return None
+
+    if re.fullmatch(r"[0-9a-fA-F]{2}", value) is None:
         return None
 
     return value.lower()
