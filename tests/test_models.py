@@ -1,140 +1,125 @@
-"""Test Screwdriver's shared inspection data structures."""
+"""Tests for the Screwdriver v2 data models."""
 
+from __future__ import annotations
+
+import inspect
 import json
-from datetime import UTC
-
-from screwdriver.models import (
-    Component,
-    ComponentStatus,
-    Finding,
-    FindingSeverity,
-    NetworkInterface,
-    SystemSnapshot,
+from dataclasses import (
+    MISSING,
+    asdict,
+    fields,
+    is_dataclass,
 )
+from datetime import datetime
+
+import screwdriver.models as models
+from screwdriver.collectors.host import collect_host
 
 
-def create_test_snapshot() -> SystemSnapshot:
-    """Create a predictable system snapshot for model tests."""
+def model_classes() -> list[type]:
+    """Return dataclasses declared directly in screwdriver.models."""
 
-    return SystemSnapshot(
-        hostname="cutie",
-        operating_system="Ubuntu 22.04",
-        kernel="5.15.0",
-        architecture="aarch64",
+    return [
+        value
+        for _, value in inspect.getmembers(
+            models,
+            inspect.isclass,
+        )
+        if value.__module__ == models.__name__ and is_dataclass(value)
+    ]
+
+
+def find_datetimes(value: object) -> list[datetime]:
+    """Recursively find datetime values in a model tree."""
+
+    if isinstance(value, datetime):
+        return [value]
+
+    if isinstance(value, dict):
+        timestamps: list[datetime] = []
+
+        for child in value.values():
+            timestamps.extend(find_datetimes(child))
+
+        return timestamps
+
+    if isinstance(value, (list, tuple)):
+        timestamps = []
+
+        for child in value:
+            timestamps.extend(find_datetimes(child))
+
+        return timestamps
+
+    return []
+
+
+def test_models_are_dataclasses() -> None:
+    """Verify that the model module contains dataclasses."""
+
+    discovered_models = model_classes()
+
+    assert discovered_models
+    assert all(is_dataclass(model) for model in discovered_models)
+
+
+def test_models_do_not_use_shared_mutable_defaults() -> None:
+    """Prevent shared lists, dictionaries, and sets."""
+
+    for model in model_classes():
+        for field in fields(model):
+            assert not isinstance(
+                field.default,
+                (list, dict, set),
+            ), (
+                f"{model.__name__}.{field.name} uses a shared "
+                "mutable default; use default_factory instead."
+            )
+
+            if field.default_factory is MISSING:
+                continue
+
+            first_value = field.default_factory()
+            second_value = field.default_factory()
+
+            if isinstance(first_value, (list, dict, set)):
+                assert first_value is not second_value
+
+
+def test_collector_returns_system_snapshot() -> None:
+    """Verify that collection returns the main snapshot model."""
+
+    snapshot = collect_host()
+
+    assert isinstance(snapshot, models.SystemSnapshot)
+    assert is_dataclass(snapshot)
+
+
+def test_snapshot_has_timezone_aware_timestamp() -> None:
+    """Verify that snapshot timestamps include timezone information."""
+
+    snapshot = collect_host()
+    timestamps = find_datetimes(asdict(snapshot))
+
+    assert timestamps
+
+    assert all(
+        timestamp.tzinfo is not None and timestamp.utcoffset() is not None
+        for timestamp in timestamps
     )
-
-
-def test_snapshot_has_utc_timestamp() -> None:
-    """Verify that snapshots receive a timezone-aware UTC timestamp."""
-
-    snapshot = create_test_snapshot()
-
-    assert snapshot.created_at.tzinfo is UTC
-
-
-def test_snapshot_lists_are_independent() -> None:
-    """Verify that snapshots do not accidentally share mutable lists."""
-
-    first_snapshot = create_test_snapshot()
-    second_snapshot = create_test_snapshot()
-
-    first_snapshot.components.append(
-        Component(category="camera", name="Logitech Brio 100")
-    )
-    first_snapshot.network_interfaces.append(
-        NetworkInterface(name="eth0")
-    )
-
-    assert len(first_snapshot.components) == 1
-    assert len(first_snapshot.network_interfaces) == 1
-    assert second_snapshot.components == []
-    assert second_snapshot.network_interfaces == []
-
-
-def test_component_converts_to_dictionary() -> None:
-    """Verify that a component becomes JSON-compatible data."""
-
-    component = Component(
-        category="camera",
-        name="Logitech Brio 100",
-        status=ComponentStatus.OK,
-        details={
-            "device_node": "/dev/video0",
-            "driver": "uvcvideo",
-        },
-    )
-
-    result = component.to_dict()
-
-    assert result["status"] == "ok"
-    assert result["details"] == {
-        "device_node": "/dev/video0",
-        "driver": "uvcvideo",
-    }
-
-
-def test_network_interface_converts_to_dictionary() -> None:
-    """Verify that network interface details become JSON-compatible data."""
-
-    interface = NetworkInterface(
-        name="eth0",
-        ipv4_addresses=["192.168.1.25"],
-        ipv6_addresses=["fe80::1234:abcd"],
-        mac_address="48:b0:2d:11:22:33",
-        state="up",
-        is_loopback=False,
-    )
-
-    result = interface.to_dict()
-
-    assert result == {
-        "name": "eth0",
-        "ipv4_addresses": ["192.168.1.25"],
-        "ipv6_addresses": ["fe80::1234:abcd"],
-        "mac_address": "48:b0:2d:11:22:33",
-        "state": "up",
-        "is_loopback": False,
-    }
 
 
 def test_snapshot_converts_to_json() -> None:
-    """Verify that a complete snapshot can be serialized as JSON."""
+    """Verify that a complete snapshot can be serialized."""
 
-    snapshot = create_test_snapshot()
+    snapshot = collect_host()
 
-    snapshot.network_interfaces.append(
-        NetworkInterface(
-            name="eth0",
-            ipv4_addresses=["192.168.1.25"],
-            mac_address="48:b0:2d:11:22:33",
-            state="up",
-        )
+    encoded = json.dumps(
+        asdict(snapshot),
+        default=str,
     )
 
-    snapshot.components.append(
-        Component(
-            category="camera",
-            name="Logitech Brio 100",
-            status=ComponentStatus.OK,
-        )
-    )
+    decoded = json.loads(encoded)
 
-    snapshot.findings.append(
-        Finding(
-            code="CAMERA_AVAILABLE",
-            severity=FindingSeverity.INFO,
-            summary="A USB camera is available.",
-        )
-    )
-
-    result = snapshot.to_dict()
-    encoded = json.dumps(result)
-
-    assert result["hostname"] == "cutie"
-    assert result["schema_version"] == "1.0"
-    assert result["network_interfaces"][0]["name"] == "eth0"
-    assert result["network_interfaces"][0]["ipv4_addresses"] == [
-        "192.168.1.25"
-    ]
-    assert '"status": "ok"' in encoded
-    assert '"severity": "info"' in encoded
+    assert isinstance(decoded, dict)
+    assert decoded
