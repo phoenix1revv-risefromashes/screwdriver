@@ -22,8 +22,10 @@ screwdriver = "screwdriver.cli:main"
 [dependency-groups]
 dev = [
     "build>=1.2,<2",
+    "mypy>=2.3.0",
     "pytest>=8.4,<9",
     "ruff>=0.12,<1",
+    "types-psutil>=7.2.2.20260518",
 ]
 
 
