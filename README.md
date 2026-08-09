@@ -1,63 +1,94 @@
 # Screwdriver
 
-Screwdriver is an agentic inspection and diagnostics tool for Linux robotics systems.
+[![CI](https://github.com/phoenix1revv-risefromashes/screwdriver/actions/workflows/ci.yml/badge.svg)](https://github.com/phoenix1revv-risefromashes/screwdriver/actions/workflows/ci.yml)
 
-Its goal is to identify the host computer, connected hardware, drivers, Linux interfaces and ROS 2 architecture—then investigate failures using verified system evidence.
 
-## Current milestone
+Screwdriver is a read-only Linux inspection and AI-assisted diagnostic tool for robotic systems.
 
-`v0.1.0` — Agentic host-system identification.
+It inspects hardware, drivers, software, networking, devices, and robotics runtimes, then helps identify bugs, misconfigurations, likely root causes, and recommended fixes.
 
-The first release will identify:
+> Screwdriver is currently under active development.
 
-- Linux distribution and kernel
-- Computer or development-board model
-- CPU, GPU, memory and storage
-- Jetson, Raspberry Pi, x86 or generic Linux platform
-- Available system commands and interfaces
-- ROS 2 environment
-- JetPack, L4T and CUDA on Jetson systems
+## Core commands
 
-## Development setup
+### Local inspection
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
+screwdriver inspect --local
 ```
 
-## Initial commands
+Creates a complete offline snapshot of the system without using AI.
+
+### Agentic inspection
 
 ```bash
-screwdriver --version
-screwdriver inspect
-python -m screwdriver inspect
+screwdriver inspect --agentic
 ```
 
-## Development checks
+Collects the same system evidence, then uses AI to organize, filter, and present the information most relevant to the user.
 
 ```bash
-python -m ruff check .
-python -m ruff format --check .
-python -m pytest
-python -m build
+screwdriver inspect --agentic --focus "camera and ROS 2"
 ```
 
-## Safety principles
+### Analyze
 
-Screwdriver begins as a strictly read-only tool.
+```bash
+screwdriver analyze snapshot.json
+```
 
-It does not:
+Analyzes an inspection snapshot to:
 
-- Use `sudo`
-- Modify system configuration
-- Move actuators
-- Communicate with hardware unnecessarily
-- Execute arbitrary AI-generated shell commands
+* Detect bugs and misconfigurations
+* Correlate failures across system layers
+* Identify likely root causes
+* Prioritize findings
+* Recommend safe troubleshooting steps
 
-The agent may select only registered, read-only scanners.
+Screwdriver recommends fixes but never applies them automatically.
+
+## Inspection areas
+
+* Operating system, kernel, CPU, memory, storage, and GPU
+* PCI and USB devices
+* Drivers, kernel modules, and device nodes
+* Network interfaces, addresses, and routes
+* Cameras, audio, serial, and CAN devices
+* Installed software and system services
+* ROS 2 installations, nodes, topics, and configuration
+
+## Quick start
+
+```bash
+git clone https://github.com/phoenix1revv-risefromashes/screwdriver.git
+cd screwdriver
+./scripts/bootstrap.sh
+```
+
+Run Screwdriver:
+
+```bash
+.tools/bin/uv run --locked screwdriver inspect --local
+```
+
+Run development checks:
+
+```bash
+.tools/bin/uv run --locked pytest
+.tools/bin/uv run --locked ruff check .
+.tools/bin/uv run --locked mypy src
+```
+
+## Safety
+
+Screwdriver operates in read-only mode. It does not modify configuration, restart services, change permissions, install packages, flash firmware, or execute AI-recommended fixes.
+
+## Documentation
+
+* [Documentation index](docs/README.md)
+* [Development environment](docs/getting-started/development-environment.md)
+* [CLI reference](docs/reference/cli.md)
 
 ## License
 
-Released under the MIT License.
+License information will be added before the first public release.

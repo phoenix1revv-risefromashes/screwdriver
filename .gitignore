@@ -1,21 +1,24 @@
+# Local development tools
+.tools/
+
+# Virtual environment
 .venv/
+
+# Python caches
 __pycache__/
 *.py[cod]
-*.egg-info/
-
 .pytest_cache/
-.ruff_cache/
 .mypy_cache/
+.ruff_cache/
+
+# Testing and coverage output
 .coverage
 htmlcov/
 
+# Package build output
 build/
 dist/
+*.egg-info/
 
-.env
-.env.*
-!.env.example
-
-.vscode/
-.idea/
-.DS_Store
+#reports
+reports/
