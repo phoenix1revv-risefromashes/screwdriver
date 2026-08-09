@@ -1,5 +1,7 @@
 # Screwdriver
 
+[![CI](https://github.com/OWNER/REPOSITORY/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPOSITORY/actions/workflows/ci.yml)
+
 Screwdriver is a read-only Linux inspection and AI-assisted diagnostic tool for robotic systems.
 
 It inspects hardware, drivers, software, networking, devices, and robotics runtimes, then helps identify bugs, misconfigurations, likely root causes, and recommended fixes.
