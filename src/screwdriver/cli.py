@@ -701,10 +701,7 @@ def _format_ros_sections(snapshot: SystemSnapshot) -> list[str]:
         sections.extend(
             _section(
                 "CURRENT DEVICES IN USE BY ROS 2",
-                [
-                    f"{index}. {label}"
-                    for index, label in enumerate(device_labels, start=1)
-                ],
+                [f"{index}. {label}" for index, label in enumerate(device_labels, start=1)],
             )
         )
 

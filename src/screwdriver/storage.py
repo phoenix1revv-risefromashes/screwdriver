@@ -366,9 +366,7 @@ def _build_component_table(title: str, components: list[Component]) -> str:
             details.get("driver"),
             details.get("ros_node") or details.get("hardware_node"),
             details.get("ros_endpoint"),
-            details.get("message_types")
-            or details.get("message_type")
-            or details.get("type"),
+            details.get("message_types") or details.get("message_type") or details.get("type"),
             details.get("health"),
         )
         cells = "".join(f"<td>{html.escape(_html_value(item))}</td>" for item in values)
@@ -422,10 +420,7 @@ def _build_ros_overview_table(component: Component) -> str:
         ("Probe", details.get("probe")),
     )
     rows = "".join(
-        "<tr>"
-        f"<th>{html.escape(label)}</th>"
-        f"<td>{html.escape(_html_value(value))}</td>"
-        "</tr>"
+        f"<tr><th>{html.escape(label)}</th><td>{html.escape(_html_value(value))}</td></tr>"
         for label, value in properties
     )
     return f"""

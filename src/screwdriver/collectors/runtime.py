@@ -522,9 +522,7 @@ def _discover_ros_graph(
             }
             nodes = _lines(results["nodes"].stdout) if results["nodes"].succeeded else []
             topics = (
-                _parse_typed_names(results["topics"].stdout)
-                if results["topics"].succeeded
-                else []
+                _parse_typed_names(results["topics"].stdout) if results["topics"].succeeded else []
             )
             services = (
                 _parse_typed_names(results["services"].stdout)
@@ -812,8 +810,7 @@ def _ros_sensor_inventory(
             kind == "camera"
             and not publishing_nodes
             and any(
-                token in topic.lower()
-                for token in ("display", "screen", "face", "hmi", "render")
+                token in topic.lower() for token in ("display", "screen", "face", "hmi", "render")
             )
         )
         if display_facing_image:
@@ -950,11 +947,7 @@ def _ros_device_inventory(
                 represented_actuator_topics.update(role_topics)
 
             message_types = sorted(
-                {
-                    topic_types[topic]
-                    for topic in role_topics
-                    if topic in topic_types
-                }
+                {topic_types[topic] for topic in role_topics if topic in topic_types}
             )
             inventory.append(
                 Component(
@@ -1186,10 +1179,7 @@ def _topics_for_device_role(
             )
             or (
                 "display" in lowered_kind
-                and any(
-                    token in text
-                    for token in ("image", "display", "screen", "face", "hmi")
-                )
+                and any(token in text for token in ("image", "display", "screen", "face", "hmi"))
             )
             or ("motor" in lowered_kind and _is_actuator_command(topic, message_type))
             or (
@@ -1259,8 +1249,7 @@ def _correlate_ros_devices_with_physical(
     for device in devices:
         details = device.details
         parameter_text = " ".join(
-            str(details.get(key) or "")
-            for key in ("configured_device", "hardware_parameters")
+            str(details.get(key) or "") for key in ("configured_device", "hardware_parameters")
         )
         if not parameter_text.strip():
             continue
@@ -1482,11 +1471,7 @@ def _ros_physical_sensor_usage(
 
         for usb_device in usb_devices:
             matching_node = next(
-                (
-                    node.path
-                    for node in usb_device.device_nodes
-                    if node.path in parameter_text
-                ),
+                (node.path for node in usb_device.device_nodes if node.path in parameter_text),
                 None,
             )
             if matching_node is not None:
@@ -1770,44 +1755,47 @@ def _hardware_relevant_nodes(
 
     for node in nodes:
         lowered = node.lower()
-        if any(
-            token in lowered
-            for token in (
-                "camera",
-                "lidar",
-                "laser",
-                "imu",
-                "gps",
-                "gnss",
-                "radar",
-                "sensor",
-                "driver",
-                "speaker",
-                "audio",
-                "sound",
-                "tts",
-                "display",
-                "screen",
-                "hmi",
-                "face",
-                "motor",
-                "servo",
-                "gripper",
-                "drive",
-                "battery",
-                "power",
-                "bms",
-                "gpio",
-                "pwm",
-                "relay",
-                "can",
-                "ethercat",
-                "modbus",
-                "serial",
-                "uart",
-                "controller_manager",
+        if (
+            any(
+                token in lowered
+                for token in (
+                    "camera",
+                    "lidar",
+                    "laser",
+                    "imu",
+                    "gps",
+                    "gnss",
+                    "radar",
+                    "sensor",
+                    "driver",
+                    "speaker",
+                    "audio",
+                    "sound",
+                    "tts",
+                    "display",
+                    "screen",
+                    "hmi",
+                    "face",
+                    "motor",
+                    "servo",
+                    "gripper",
+                    "drive",
+                    "battery",
+                    "power",
+                    "bms",
+                    "gpio",
+                    "pwm",
+                    "relay",
+                    "can",
+                    "ethercat",
+                    "modbus",
+                    "serial",
+                    "uart",
+                    "controller_manager",
+                )
             )
-        ) and node not in relevant:
+            and node not in relevant
+        ):
             relevant.append(node)
 
     # Probe remaining nodes as budget permits. A generically named hardware driver

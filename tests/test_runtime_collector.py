@@ -148,12 +148,9 @@ def test_running_graph_discovers_endpoints_controllers_and_correlations(
     assert any(item.name == "mobile_base_system" for item in result.actuators)
     assert any(item.details.get("kind") == "mobile base drive" for item in result.actuators)
     assert any(item.details.get("device_class") == "sensor / input" for item in result.devices)
+    assert any(item.details.get("device_class") == "actuator / output" for item in result.devices)
     assert any(
-        item.details.get("device_class") == "actuator / output" for item in result.devices
-    )
-    assert any(
-        item.details.get("device_class") == "controller / interface"
-        for item in result.devices
+        item.details.get("device_class") == "controller / interface" for item in result.devices
     )
     ros_camera = next(
         item for item in result.sensors if item.details.get("source") == "ROS 2 runtime"
@@ -275,9 +272,7 @@ def test_direct_dds_fallback_recovers_graph_when_daemon_returns_empty(
     assert result.ros_runtime[0].details["state"] == "RUNNING"
     assert result.ros_runtime[0].details["discovery_mode"] == "direct DDS"
     assert any(item.details.get("kind") == "lidar" for item in result.sensors)
-    assert any(
-        finding.code == "ROS_RUNTIME_DISCOVERY_RECOVERED" for finding in result.findings
-    )
+    assert any(finding.code == "ROS_RUNTIME_DISCOVERY_RECOVERED" for finding in result.findings)
 
 
 def test_ros_lidar_is_mapped_to_exact_usb_uart_device_from_node_configuration(
@@ -409,9 +404,7 @@ def test_graph_discovery_uses_environment_recovered_from_running_ros_process(
     assert result.ros_runtime[0].details["state"] == "RUNNING"
     assert result.ros_runtime[0].details["domain_id"] == "7"
     assert result.ros_runtime[0].details["environment_recovered"] is True
-    assert any(
-        finding.code == "ROS_RUNTIME_ENVIRONMENT_RECOVERED" for finding in result.findings
-    )
+    assert any(finding.code == "ROS_RUNTIME_ENVIRONMENT_RECOVERED" for finding in result.findings)
 
 
 def test_ros_device_inventory_covers_non_sensor_hardware_roles(
@@ -443,8 +436,7 @@ def test_ros_device_inventory_covers_non_sensor_hardware_roles(
             "Publishers:\n  /audio_in: audio_common_msgs/msg/AudioData\nSubscribers:\n"
         ),
         ("node", "info", "/speaker_node"): (
-            "Publishers:\nSubscribers:\n"
-            "  /audio_out: audio_common_msgs/msg/AudioData\n"
+            "Publishers:\nSubscribers:\n  /audio_out: audio_common_msgs/msg/AudioData\n"
         ),
         ("node", "info", "/face_display"): (
             "Publishers:\nSubscribers:\n  /face/image: sensor_msgs/msg/Image\n"
@@ -453,8 +445,7 @@ def test_ros_device_inventory_covers_non_sensor_hardware_roles(
             "Publishers:\nSubscribers:\n  /cmd_vel: geometry_msgs/msg/Twist\n"
         ),
         ("node", "info", "/battery_monitor"): (
-            "Publishers:\n  /battery_state: sensor_msgs/msg/BatteryState\n"
-            "Subscribers:\n"
+            "Publishers:\n  /battery_state: sensor_msgs/msg/BatteryState\nSubscribers:\n"
         ),
         ("node", "info", "/led_controller"): (
             "Publishers:\nSubscribers:\n  /led/color: std_msgs/msg/ColorRGBA\n"
