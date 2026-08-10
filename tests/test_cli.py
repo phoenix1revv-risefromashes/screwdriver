@@ -1,5 +1,6 @@
-"""Test the public inspect command and report creation."""
+"""Test the public inspect and analyze commands."""
 
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import patch
@@ -420,7 +421,7 @@ def test_inspect_defaults_to_local_and_writes_all_reports(
     assert "CURRENT DEVICES IN USE BY ROS 2" in text_report
 
 
-def test_agentic_mode_is_honest_about_current_scope(
+def test_agentic_mode_generates_two_reports(
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
 ) -> None:
@@ -433,6 +434,8 @@ def test_agentic_mode_is_honest_about_current_scope(
                 [
                     "inspect",
                     "--agentic",
+                    "--provider",
+                    "none",
                     "--output",
                     str(tmp_path),
                 ]
@@ -442,7 +445,12 @@ def test_agentic_mode_is_honest_about_current_scope(
 
     output = capsys.readouterr().out
     assert "Inspection mode: agentic" in output
-    assert "agent reasoning not implemented yet" in output
+    assert "System blueprint:" in output
+    assert "Diagnostic report:" in output
+    assert "Problems reported:" in output
+    assert (tmp_path / "system-blueprint.html").is_file()
+    assert (tmp_path / "diagnostic-report.html").is_file()
+    assert (tmp_path / "agent-analysis.json").is_file()
 
 
 def test_empty_optional_runtime_inventories_are_not_printed(
@@ -480,8 +488,33 @@ def test_focus_requires_agentic_mode() -> None:
     assert error.value.code == 2
 
 
-def test_analyze_command_was_removed() -> None:
-    with pytest.raises(SystemExit) as error:
-        main(["analyze", "snapshot.json"])
+def test_analyze_existing_snapshot_generates_two_reports(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    snapshot_path = tmp_path / "snapshot.json"
+    output_path = tmp_path / "analysis"
+    snapshot_path.write_text(
+        json.dumps(_snapshot().to_dict()),
+        encoding="utf-8",
+    )
 
-    assert error.value.code == 2
+    assert (
+        main(
+            [
+                "analyze",
+                str(snapshot_path),
+                "--provider",
+                "none",
+                "--output",
+                str(output_path),
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    assert "SCREWDRIVER AGENTIC ANALYSIS" in output
+    assert "Repairs executed:  no" in output
+    assert (output_path / "system-blueprint.html").is_file()
+    assert (output_path / "diagnostic-report.html").is_file()
+    assert (output_path / "agent-analysis.json").is_file()

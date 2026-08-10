@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
+from screwdriver.agentic import analyze_snapshot_file
 from screwdriver.collectors import collect_host
 from screwdriver.models import (
     Component,
@@ -43,7 +44,7 @@ def build_parser() -> argparse.ArgumentParser:
     modes.add_argument(
         "--agentic",
         action="store_true",
-        help="Reserve agent-assisted interpretation for a later implementation.",
+        help="Generate a system blueprint and diagnostic report after collection.",
     )
     inspect_parser.add_argument(
         "--focus",
@@ -55,7 +56,52 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("reports"),
         help="Report directory (default: reports).",
     )
+    _add_agent_options(inspect_parser)
+
+    analyze_parser = subparsers.add_parser(
+        "analyze",
+        help="Analyze an existing snapshot and generate two agentic reports.",
+    )
+    analyze_parser.add_argument("snapshot", type=Path, help="Path to snapshot.json.")
+    analyze_parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("reports/analysis"),
+        help="Analysis report directory (default: reports/analysis).",
+    )
+    analyze_parser.add_argument(
+        "--focus",
+        help="Focus analysis on one subsystem while retaining complete evidence.",
+    )
+    _add_agent_options(analyze_parser)
     return parser
+
+
+def _add_agent_options(parser: argparse.ArgumentParser) -> None:
+    """Add provider and passive-investigation options to an agent command."""
+
+    parser.add_argument(
+        "--provider",
+        choices=("anthropic", "none"),
+        default="anthropic",
+        help="AI provider: Anthropic Claude or deterministic analysis only.",
+    )
+    parser.add_argument(
+        "--model",
+        default="claude-sonnet-5",
+        help="Anthropic model name (default: claude-sonnet-5).",
+    )
+    parser.add_argument(
+        "--effort",
+        choices=("low", "medium", "high", "xhigh"),
+        default="medium",
+        help="Claude reasoning effort (default: medium).",
+    )
+    parser.add_argument(
+        "--investigate",
+        action="store_true",
+        help="Allow a bounded catalog of additional read-only diagnostic probes.",
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -69,7 +115,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "inspect":
         if args.focus and not args.agentic:
             parser.error("--focus can only be used with --agentic")
+        if args.investigate and not args.agentic:
+            parser.error("--investigate can only be used with --agentic")
         return _run_inspect(args)
+    if args.command == "analyze":
+        try:
+            return _run_analyze(args)
+        except ValueError as exception:
+            parser.error(str(exception))
     parser.error(f"Unknown command: {args.command}")
     return 2
 
@@ -91,8 +144,51 @@ def _run_inspect(args: argparse.Namespace) -> int:
         paths=paths,
         focus=args.focus,
     )
-    save_reports(snapshot, report, args.output)
+    report_paths = save_reports(snapshot, report, args.output)
     print(report)
+    if args.agentic:
+        outcome = analyze_snapshot_file(
+            report_paths.snapshot,
+            args.output,
+            provider=args.provider,
+            model=args.model,
+            effort=args.effort,
+            investigate=args.investigate,
+            focus=args.focus,
+        )
+        print("\n\nAGENTIC REPORTS")
+        print("─" * _WIDTH)
+        print(f"System blueprint:  {outcome.paths.blueprint}")
+        print(f"Diagnostic report: {outcome.paths.diagnostics}")
+        print(f"Structured analysis: {outcome.paths.analysis}")
+        print(f"Analysis engine:    {outcome.provider_status}")
+        print(f"Problems reported: {len(outcome.issues)}")
+        print(f"Read-only probes:  {len(outcome.probes)}")
+    return 0
+
+
+def _run_analyze(args: argparse.Namespace) -> int:
+    """Analyze an existing snapshot without collecting or changing system state."""
+
+    outcome = analyze_snapshot_file(
+        args.snapshot,
+        args.output,
+        provider=args.provider,
+        model=args.model,
+        effort=args.effort,
+        investigate=args.investigate,
+        focus=args.focus,
+    )
+    print("SCREWDRIVER AGENTIC ANALYSIS")
+    print("─" * _WIDTH)
+    print(f"Source snapshot:   {args.snapshot}")
+    print(f"System blueprint:  {outcome.paths.blueprint}")
+    print(f"Diagnostic report: {outcome.paths.diagnostics}")
+    print(f"Structured analysis: {outcome.paths.analysis}")
+    print(f"Analysis engine:   {outcome.provider_status}")
+    print(f"Problems reported: {len(outcome.issues)}")
+    print(f"Read-only probes:  {len(outcome.probes)}")
+    print("Repairs executed:  no")
     return 0
 
 
@@ -128,8 +224,8 @@ def format_snapshot(
     if mode == "agentic":
         lines.extend(
             [
-                "Agentic status:  collection complete; agent reasoning not implemented yet",
-                "                 (the report below remains deterministic and offline)",
+                "Agentic status:  collection followed by blueprint and diagnostic analysis",
+                "Repair policy:   recommendations only; no fixes are executed",
             ]
         )
 

@@ -25,11 +25,34 @@ Creates a complete offline snapshot of the system without using AI.
 screwdriver inspect --agentic
 ```
 
-Collects the same system evidence, then uses AI to organize, filter, and present the information most relevant to the user.
+Collects the same system evidence, then generates:
+
+* `system-blueprint.html` — a detailed, organized map of the robotic system
+* `diagnostic-report.html` — failures, likely causes, and step-by-step solutions
+* `agent-analysis.json` — the structured evidence behind both reports
+
+By default, Screwdriver uses Anthropic Claude Sonnet 5 and falls back to deterministic
+reporting if the API is unavailable. The API key is read only from the
+`ANTHROPIC_API_KEY` environment variable and is never written to reports.
+
+```bash
+export ANTHROPIC_API_KEY="your-new-key"
+screwdriver inspect --agentic
+```
 
 ```bash
 screwdriver inspect --agentic --focus "camera and ROS 2"
 ```
+
+Allow the agent to request a bounded set of additional read-only checks:
+
+```bash
+screwdriver inspect --agentic --investigate
+```
+
+The investigation catalog contains metadata-only checks such as `ros2 node info`,
+`ros2 topic info --verbose`, `udevadm info`, `lsof`, and recent kernel logs. It
+does not accept arbitrary commands.
 
 ### Analyze
 
@@ -46,6 +69,21 @@ Analyzes an inspection snapshot to:
 * Recommend safe troubleshooting steps
 
 Screwdriver recommends fixes but never applies them automatically.
+
+Run without a model:
+
+```bash
+screwdriver analyze snapshot.json --provider none
+```
+
+Use Claude Sonnet 5 explicitly:
+
+```bash
+screwdriver analyze snapshot.json \
+  --provider anthropic \
+  --model claude-sonnet-5 \
+  --effort medium
+```
 
 ## Inspection areas
 

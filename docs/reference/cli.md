@@ -65,10 +65,15 @@ Generated files:
 
 ```text
 snapshot.json
-agentic-snapshot.html
+system-blueprint.html
+diagnostic-report.html
+agent-analysis.json
 ```
 
-The complete `snapshot.json` remains local. Only selected and redacted evidence may be sent to the configured AI provider.
+The complete `snapshot.json` remains local. Agentic analysis uses Anthropic Claude
+Sonnet 5. The API key is read from `ANTHROPIC_API_KEY` and is never stored in a
+report. The evidence view removes machine IDs, serial numbers, MAC addresses, and
+the default gateway before model analysis.
 
 A focused inspection can be requested with:
 
@@ -77,7 +82,9 @@ screwdriver inspect --agentic \
   --focus "camera, networking, and ROS 2"
 ```
 
-The agentic inspection explains what is installed and how components relate. It does not diagnose faults or recommend fixes.
+The system blueprint explains what is installed and how components relate. The
+diagnostic report separately explains observed problems, likely causes, ordered
+solution approaches, diagnostic commands, and measurable success criteria.
 
 ### Options
 
@@ -87,9 +94,10 @@ The agentic inspection explains what is installed and how components relate. It 
 | `--agentic` | Produce an AI-organized inspection |
 | `--focus TEXT` | Focus agentic inspection on selected areas |
 | `--output PATH` | Select the output directory |
-| `--format FORMAT` | Select `json`, `html`, or `all` |
-| `--no-redact` | Disable redaction for local output only |
-| `--verbose` | Display detailed inspection progress |
+| `--provider anthropic\|none` | Select Claude or deterministic analysis |
+| `--model MODEL` | Select the Anthropic model (default `claude-sonnet-5`) |
+| `--effort low\|medium\|high\|xhigh` | Balance Claude reasoning and token use (default `medium`) |
+| `--investigate` | Permit the closed catalog of extra read-only probes |
 
 `--local` and `--agentic` are mutually exclusive.
 
@@ -116,8 +124,9 @@ The command:
 Generated files:
 
 ```text
-analysis-report.json
-analysis-report.html
+system-blueprint.html
+diagnostic-report.html
+agent-analysis.json
 ```
 
 Example:
@@ -126,6 +135,11 @@ Example:
 screwdriver analyze snapshot.json \
   --output reports/analysis
 ```
+
+`--investigate` authorizes at most four additional probes chosen from a closed
+catalog. Probe arguments are validated, commands run without a shell, output and
+execution time are bounded, and probes only run when the snapshot hostname
+matches the current computer.
 
 ## Command boundaries
 
