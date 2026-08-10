@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
 
+from screwdriver.report_time import REPORT_TIMEZONE_NAME, report_isoformat
+
 
 class ComponentStatus(str, Enum):
     """Represent the operational state of an inspected component."""
@@ -114,7 +116,7 @@ class OperatingSystemInfo:
             "init_system": self.init_system,
             "package_manager": self.package_manager,
             "timezone": self.timezone,
-            "boot_time": self.boot_time.isoformat(),
+            "boot_time": report_isoformat(self.boot_time),
             "uptime_seconds": self.uptime_seconds,
             "process_count": self.process_count,
         }
@@ -549,7 +551,12 @@ class SystemSnapshot:
     network: NetworkInfo
     usb_devices: list[USBDevice] = field(default_factory=list)
     serial_devices: list[SerialDevice] = field(default_factory=list)
-    schema_version: str = "2.0"
+    software_stack_inventory: list[Component] = field(default_factory=list)
+    sensor_inventory: list[Component] = field(default_factory=list)
+    actuator_inventory: list[Component] = field(default_factory=list)
+    ros_device_inventory: list[Component] = field(default_factory=list)
+    ros_runtime_inventory: list[Component] = field(default_factory=list)
+    schema_version: str = "3.1"
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     components: list[Component] = field(default_factory=list)
     findings: list[Finding] = field(default_factory=list)
@@ -557,7 +564,8 @@ class SystemSnapshot:
     def to_dict(self) -> dict[str, object]:
         return {
             "schema_version": self.schema_version,
-            "created_at": self.created_at.isoformat(),
+            "created_at": report_isoformat(self.created_at),
+            "report_timezone": REPORT_TIMEZONE_NAME,
             "identity": self.identity.to_dict(),
             "operating_system": self.operating_system.to_dict(),
             "platform": self.platform.to_dict(),
@@ -570,6 +578,17 @@ class SystemSnapshot:
             "network": self.network.to_dict(),
             "usb_devices": [device.to_dict() for device in self.usb_devices],
             "serial_devices": [device.to_dict() for device in self.serial_devices],
+            "software_stack_inventory": [
+                component.to_dict() for component in self.software_stack_inventory
+            ],
+            "sensor_inventory": [component.to_dict() for component in self.sensor_inventory],
+            "actuator_inventory": [component.to_dict() for component in self.actuator_inventory],
+            "ros_device_inventory": [
+                component.to_dict() for component in self.ros_device_inventory
+            ],
+            "ros_runtime_inventory": [
+                component.to_dict() for component in self.ros_runtime_inventory
+            ],
             "components": [component.to_dict() for component in self.components],
             "findings": [finding.to_dict() for finding in self.findings],
         }

@@ -10,10 +10,11 @@ from dataclasses import (
     fields,
     is_dataclass,
 )
-from datetime import datetime
+from datetime import UTC, datetime
 
 import screwdriver.models as models
 from screwdriver.collectors.host import collect_host
+from screwdriver.report_time import format_report_time, report_isoformat
 
 
 def model_classes() -> list[type]:
@@ -123,3 +124,30 @@ def test_snapshot_converts_to_json() -> None:
 
     assert isinstance(decoded, dict)
     assert decoded
+
+
+def test_snapshot_serializes_all_runtime_inventories() -> None:
+    """Keep every runtime inventory in the stable JSON contract."""
+
+    snapshot = collect_host()
+    payload = snapshot.to_dict()
+
+    assert payload["schema_version"] == "3.1"
+    assert "software_stack_inventory" in payload
+    assert "sensor_inventory" in payload
+    assert "actuator_inventory" in payload
+    assert "ros_device_inventory" in payload
+    assert "ros_runtime_inventory" in payload
+    assert payload["report_timezone"] == "America/Los_Angeles"
+
+
+def test_report_time_uses_los_angeles_dst_rules() -> None:
+    """Use PDT in summer and PST in winter without hard-coded offsets."""
+
+    summer = datetime(2026, 8, 10, 12, tzinfo=UTC)
+    winter = datetime(2026, 1, 10, 12, tzinfo=UTC)
+
+    assert format_report_time(summer) == "2026-08-10 05:00:00 PDT"
+    assert report_isoformat(summer) == "2026-08-10T05:00:00-07:00"
+    assert format_report_time(winter) == "2026-01-10 04:00:00 PST"
+    assert report_isoformat(winter) == "2026-01-10T04:00:00-08:00"
