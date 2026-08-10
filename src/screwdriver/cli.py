@@ -10,11 +10,14 @@ from pathlib import Path
 
 from screwdriver.collectors import collect_host
 from screwdriver.models import (
+    Component,
     FindingSeverity,
     NetworkInterface,
+    SerialDevice,
     SystemSnapshot,
     USBDevice,
 )
+from screwdriver.report_time import REPORT_TIMEZONE_NAME, format_report_time
 from screwdriver.storage import ReportPaths, build_report_paths, save_reports
 
 _WIDTH = 72
@@ -114,7 +117,9 @@ def format_snapshot(
         "╰" + "─" * (_WIDTH - 2) + "╯",
         "",
         f"Inspection mode: {mode}",
-        f"Started:         {started_at.strftime('%Y-%m-%d %H:%M:%S UTC')}",
+        "Probe safety:    PASSIVE",
+        f"Report timezone: {REPORT_TIMEZONE_NAME}",
+        f"Started:         {format_report_time(started_at)}",
     ]
 
     if focus:
@@ -156,10 +161,10 @@ def format_snapshot(
                 _row("Boot mode", operating_system.boot_mode),
                 _row("Init system", operating_system.init_system),
                 _row("Package manager", operating_system.package_manager),
-                _row("Timezone", operating_system.timezone),
+                _row("System timezone", operating_system.timezone),
                 _row(
                     "Boot time",
-                    operating_system.boot_time.strftime("%Y-%m-%d %H:%M:%S UTC"),
+                    format_report_time(operating_system.boot_time),
                 ),
                 _row("Uptime", _format_duration(operating_system.uptime_seconds)),
                 _row("Running processes", operating_system.process_count),
@@ -422,6 +427,52 @@ def format_snapshot(
 
     lines.extend(_section("USB HARDWARE INVENTORY", usb_lines))
 
+    serial_lines = [
+        "Passive metadata only — serial ports were not opened and DTR/RTS were not toggled.",
+        "",
+    ]
+
+    if not snapshot.serial_devices:
+        serial_lines.append("No hardware-backed serial/TTY ports were discovered.")
+
+    for index, serial_device in enumerate(snapshot.serial_devices, start=1):
+        serial_lines.extend(_format_serial_device(serial_device, index))
+
+    lines.extend(_section("SERIAL / TTY DIAGNOSTICS", serial_lines))
+
+    if snapshot.software_stack_inventory:
+        lines.extend(
+            _section(
+                "SOFTWARE STACK INVENTORY",
+                _format_component_inventory(snapshot.software_stack_inventory),
+            )
+        )
+    physical_sensors = [
+        component
+        for component in snapshot.sensor_inventory
+        if not _is_ros_inventory_component(component)
+    ]
+    if physical_sensors:
+        lines.extend(
+            _section(
+                "PHYSICAL SENSOR INVENTORY",
+                _format_component_inventory(physical_sensors),
+            )
+        )
+    physical_actuators = [
+        component
+        for component in snapshot.actuator_inventory
+        if not _is_ros_inventory_component(component)
+    ]
+    if physical_actuators:
+        lines.extend(
+            _section(
+                "PHYSICAL ACTUATOR / CONTROL INVENTORY",
+                _format_component_inventory(physical_actuators),
+            )
+        )
+    lines.extend(_format_ros_sections(snapshot))
+
     severity_counts = {
         severity: sum(finding.severity is severity for finding in snapshot.findings)
         for severity in FindingSeverity
@@ -463,7 +514,7 @@ def format_snapshot(
         _row("Duration", f"{duration:.2f} seconds"),
         _row(
             "Completed",
-            datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC"),
+            format_report_time(datetime.now(UTC)),
         ),
         "",
         "No configuration, device state, or hardware output was changed.",
@@ -535,13 +586,259 @@ def _format_usb_device(device: USBDevice, index: int) -> list[str]:
     return lines
 
 
+def _format_serial_device(device: SerialDevice, index: int) -> list[str]:
+    lines = [
+        f"Serial device {index}: {device.display_name}",
+        _row("  Port", device.port),
+        _row("  Transport", device.transport),
+        _row("  Kernel driver", device.driver),
+        _row("  USB ID", device.usb_id),
+        _row("  Stable by-id", device.stable_id_path or "not available"),
+        _row("  Physical path", device.physical_path or "not available"),
+    ]
+
+    if device.device_node is None:
+        lines.append(_row("  Access", "device node missing"))
+    else:
+        lines.append(_row("  Access", device.device_node.access))
+
+    lines.append("")
+    return lines
+
+
+def _format_component_inventory(
+    components: list[Component],
+    *,
+    limit: int = 30,
+) -> list[str]:
+    """Format a bounded inventory summary; JSON and HTML retain every item."""
+
+    lines = [
+        "Passive metadata only — no sensor stream was read and no actuator was commanded.",
+        "",
+    ]
+    for index, component in enumerate(components[:limit], start=1):
+        details = component.details
+        lines.extend(
+            [
+                f"{index}. {component.name}",
+                _row("  Category", component.category),
+                _row("  Status", component.status.value.upper()),
+                _row("  State", details.get("state")),
+            ]
+        )
+        for label, key in (
+            ("  Kind", "kind"),
+            ("  Source", "source"),
+            ("  Bus", "bus"),
+            ("  Device / channel", "channel"),
+            ("  Driver", "driver"),
+            ("  ROS node", "ros_node"),
+            ("  ROS publisher", "hardware_node"),
+            ("  ROS endpoint", "ros_endpoint"),
+            ("  Message type", "message_type"),
+            ("  Configured device", "configured_device"),
+            ("  Health", "health"),
+            ("  Confidence", "confidence"),
+            ("  Physical match", "physical_component"),
+        ):
+            value = details.get(key)
+            if value is not None and value != "":
+                lines.append(_row(label, value))
+
+        lines.append("")
+
+    remaining = len(components) - limit
+    if remaining > 0:
+        lines.append(
+            f"{remaining} additional items are available in snapshot.json and report.html."
+        )
+
+    return lines
+
+
+def _format_ros_sections(snapshot: SystemSnapshot) -> list[str]:
+    """Render the ROS graph as distinct, readable property groups."""
+
+    sections: list[str] = []
+    runtime_groups = {
+        category: [
+            component
+            for component in snapshot.ros_runtime_inventory
+            if component.category == category
+        ]
+        for category in (
+            "ROS runtime",
+            "ROS node",
+            "ROS topic",
+            "ROS service",
+            "ROS action",
+            "ros2_control hardware",
+        )
+    }
+
+    overview = runtime_groups["ROS runtime"]
+    if overview:
+        sections.extend(_section("ROS 2 OVERVIEW", _format_ros_overview(overview[0])))
+
+    for title, category in (
+        ("ROS 2 NODES", "ROS node"),
+        ("ROS 2 TOPICS", "ROS topic"),
+        ("ROS 2 SERVICES", "ROS service"),
+        ("ROS 2 ACTIONS", "ROS action"),
+    ):
+        components = runtime_groups[category]
+        if components:
+            sections.extend(
+                _section(
+                    title,
+                    _format_ros_graph_items(components, category=category),
+                )
+            )
+
+    device_labels = _current_ros_device_labels(snapshot.ros_device_inventory)
+    if device_labels:
+        sections.extend(
+            _section(
+                "CURRENT DEVICES IN USE BY ROS 2",
+                [f"{index}. {label}" for index, label in enumerate(device_labels, start=1)],
+            )
+        )
+
+    control_hardware = runtime_groups["ros2_control hardware"]
+    if control_hardware:
+        sections.extend(
+            _section(
+                "ROS 2 CONTROL HARDWARE INTERFACES",
+                _format_component_inventory(control_hardware),
+            )
+        )
+
+    return sections
+
+
+def _format_ros_overview(component: Component) -> list[str]:
+    details = component.details
+    return [
+        _row("Graph state", details.get("state")),
+        _row("ROS distribution", details.get("ros_distro")),
+        _row("Domain ID", details.get("domain_id")),
+        _row("DDS middleware", details.get("middleware")),
+        _row("Discovery mode", details.get("discovery_mode")),
+        _row("Environment recovered", _yes_no(bool(details.get("environment_recovered")))),
+        _row("Nodes", details.get("nodes")),
+        _row("Topics", details.get("topics")),
+        _row("Services", details.get("services")),
+        _row("Actions", details.get("actions")),
+        _row("Probe", details.get("probe")),
+    ]
+
+
+def _format_ros_graph_items(
+    components: list[Component],
+    *,
+    category: str,
+    limit: int = 50,
+) -> list[str]:
+    """List ROS graph objects separately while keeping terminal output bounded."""
+
+    lines: list[str] = []
+    for index, component in enumerate(components[:limit], start=1):
+        details = component.details
+        lines.append(f"{index}. {component.name}")
+        if category == "ROS node":
+            for label, key in (
+                ("  State", "state"),
+                ("  Publishers", "publishers"),
+                ("  Subscribers", "subscribers"),
+                ("  Services", "services"),
+                ("  Actions", "actions"),
+                ("  Hardware parameters", "hardware_parameters"),
+            ):
+                value = details.get(key)
+                if value is not None and value != "":
+                    lines.append(_row(label, value))
+        else:
+            lines.append(_row("  Type", details.get("type")))
+        lines.append("")
+
+    remaining = len(components) - limit
+    if remaining > 0:
+        lines.append(
+            f"{remaining} additional {category.lower()} items are available in "
+            "snapshot.json and report.html."
+        )
+    return lines
+
+
+def _current_ros_device_labels(components: list[Component]) -> list[str]:
+    """Return one concise, deduplicated label per device kind currently in use."""
+
+    aliases = {
+        "camera": "Camera",
+        "lidar": "LiDAR",
+        "point-cloud sensor": "Point-cloud sensor",
+        "imu": "IMU",
+        "gps/gnss": "GPS/GNSS",
+        "range sensor": "Range sensor",
+        "joint-state feedback": "Joint-state feedback device",
+        "magnetometer": "Magnetometer",
+        "pressure sensor": "Pressure sensor",
+        "temperature sensor": "Temperature sensor",
+        "humidity sensor": "Humidity sensor",
+        "light sensor": "Light sensor",
+        "force/torque sensor": "Force/torque sensor",
+        "microphone": "Microphone",
+        "microphone / audio capture": "Microphone",
+        "speaker / audio output": "Speaker",
+        "display / visual output": "Display unit",
+        "mobile base drive": "Mobile base",
+        "motor / actuator controller": "Motor / actuator",
+        "joint/motor controller": "Joint / motor controller",
+        "gripper": "Gripper",
+        "power / battery device": "Battery / power system",
+        "digital i/o / lighting device": "GPIO / lighting",
+        "hardware communication interface": "Communication interface",
+        "ros2_control controller": "ROS 2 controller",
+        "ros2_control hardware component": "ROS 2 control hardware",
+        "unclassified ros-attached device": "Other ROS-attached hardware",
+    }
+    labels: list[str] = []
+    seen: set[str] = set()
+
+    for component in components:
+        details = component.details
+        state = str(details.get("state") or "").upper()
+        if state not in {"IN_USE_BY_ROS", "ACTIVE", "RUNNING"}:
+            continue
+
+        kind = str(details.get("kind") or "").strip()
+        if not kind:
+            continue
+        label = aliases.get(kind.lower(), kind.replace("_", " ").capitalize())
+        key = label.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        labels.append(label)
+
+    return labels
+
+
+def _is_ros_inventory_component(component: Component) -> bool:
+    source = str(component.details.get("source") or "")
+    return source.startswith("ROS 2") or component.details.get("state") == "IN_USE_BY_ROS"
+
+
 def _section(title: str, content: list[str]) -> list[str]:
     return ["", "", title, "─" * _WIDTH, *content]
 
 
 def _row(label: str, value: object) -> str:
     display = "unavailable" if value is None or value == "" else str(value)
-    return f"{label + ':':<20}{display}"
+    field = f"{label}:"
+    separator = " " if len(field) >= 20 else ""
+    return f"{field:<20}{separator}{display}"
 
 
 def _format_bytes(value: int) -> str:

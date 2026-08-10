@@ -8,6 +8,8 @@ import pytest
 
 from screwdriver.cli import main
 from screwdriver.models import (
+    Component,
+    ComponentStatus,
     CPUInfo,
     DeviceNode,
     Finding,
@@ -19,6 +21,7 @@ from screwdriver.models import (
     OperatingSystemInfo,
     PlatformInfo,
     PowerInfo,
+    SerialDevice,
     SystemSnapshot,
     USBDevice,
 )
@@ -122,6 +125,200 @@ def _snapshot() -> SystemSnapshot:
                 ],
             )
         ],
+        serial_devices=[
+            SerialDevice(
+                port="/dev/ttyUSB0",
+                sysfs_name="ttyUSB0",
+                transport="usb-serial",
+                driver="cp210x",
+                stable_id_path=("/dev/serial/by-id/usb-Silicon_Labs_CP2102N_bridge-123"),
+                usb_vendor_id="10c4",
+                usb_product_id="ea60",
+                manufacturer="Silicon Labs",
+                product_name="CP2102N USB to UART Bridge",
+                serial_number="bridge-123",
+                device_node=DeviceNode(
+                    path="/dev/ttyUSB0",
+                    node_type="character",
+                    permissions="crw-rw----",
+                    owner="root",
+                    group="dialout",
+                    readable=True,
+                    writable=True,
+                ),
+            )
+        ],
+        software_stack_inventory=[
+            Component(
+                category="software stack",
+                name="Navigation2",
+                status=ComponentStatus.OK,
+                details={"state": "RUNNING", "running": True},
+            )
+        ],
+        sensor_inventory=[
+            Component(
+                category="sensor",
+                name="camera — /camera/image_raw",
+                status=ComponentStatus.OK,
+                details={
+                    "state": "AVAILABLE",
+                    "kind": "camera",
+                    "source": "ROS 2 runtime",
+                    "bus": "DDS",
+                    "channel": "/camera/image_raw",
+                    "message_type": "sensor_msgs/msg/Image",
+                    "hardware_node": "/camera_node",
+                    "physical_component": "Logitech Brio 100",
+                    "physical_bus": "USB",
+                    "physical_channel": "/dev/video0",
+                    "driver": "uvcvideo",
+                    "health": "ENDPOINT_AVAILABLE_DATA_NOT_SAMPLED",
+                },
+            )
+        ],
+        actuator_inventory=[
+            Component(
+                category="actuator/control",
+                name="mobile base drive — /cmd_vel",
+                status=ComponentStatus.OK,
+                details={
+                    "state": "AVAILABLE",
+                    "kind": "mobile base drive",
+                    "source": "ROS 2 runtime",
+                    "bus": "DDS",
+                    "channel": "/cmd_vel",
+                    "health": "COMMAND_ENDPOINT_AVAILABLE_MOTION_NOT_TESTED",
+                },
+            )
+        ],
+        ros_device_inventory=[
+            Component(
+                category="ROS device",
+                name="camera — /camera_node",
+                status=ComponentStatus.OK,
+                details={
+                    "device_class": "sensor / input",
+                    "kind": "camera",
+                    "direction": "input",
+                    "source": "ROS 2 runtime",
+                    "ros_node": "/camera_node",
+                    "topics": "/camera/image_raw",
+                    "message_types": "sensor_msgs/msg/Image",
+                    "physical_component": "Logitech Brio 100",
+                    "physical_bus": "USB",
+                    "physical_channel": "/dev/video0",
+                    "driver": "uvcvideo",
+                    "state": "IN_USE_BY_ROS",
+                    "confidence": "VERIFIED",
+                },
+            ),
+            Component(
+                category="ROS device",
+                name="speaker / audio output — /speaker_node",
+                status=ComponentStatus.OK,
+                details={
+                    "device_class": "audio",
+                    "kind": "speaker / audio output",
+                    "direction": "output",
+                    "source": "ROS 2 runtime",
+                    "ros_node": "/speaker_node",
+                    "topics": "/audio_out",
+                    "message_types": "audio_common_msgs/msg/AudioData",
+                    "state": "IN_USE_BY_ROS",
+                    "confidence": "VERIFIED",
+                },
+            ),
+            Component(
+                category="ROS device",
+                name="display / visual output — /face_display",
+                status=ComponentStatus.OK,
+                details={
+                    "device_class": "display / HMI",
+                    "kind": "display / visual output",
+                    "direction": "output",
+                    "source": "ROS 2 runtime",
+                    "ros_node": "/face_display",
+                    "topics": "/face/image",
+                    "message_types": "sensor_msgs/msg/Image",
+                    "state": "IN_USE_BY_ROS",
+                    "confidence": "CORRELATED",
+                },
+            ),
+            Component(
+                category="ROS device",
+                name="mobile base drive — /base_controller",
+                status=ComponentStatus.OK,
+                details={
+                    "device_class": "actuator / output",
+                    "kind": "mobile base drive",
+                    "direction": "output / control",
+                    "source": "ROS 2 runtime",
+                    "ros_node": "/base_controller",
+                    "topics": "/cmd_vel",
+                    "message_types": "geometry_msgs/msg/Twist",
+                    "state": "IN_USE_BY_ROS",
+                    "confidence": "VERIFIED",
+                },
+            ),
+        ],
+        ros_runtime_inventory=[
+            Component(
+                category="ROS runtime",
+                name="ROS 2 graph",
+                status=ComponentStatus.OK,
+                details={
+                    "state": "RUNNING",
+                    "nodes": 4,
+                    "topics": 8,
+                    "services": 3,
+                    "actions": 1,
+                    "ros_distro": "humble",
+                    "domain_id": "0",
+                    "middleware": "rmw_fastrtps_cpp",
+                    "discovery_mode": "daemon",
+                    "environment_recovered": False,
+                    "probe": "metadata only",
+                },
+            ),
+            Component(
+                category="ROS node",
+                name="/camera_node",
+                status=ComponentStatus.OK,
+                details={
+                    "state": "RUNNING",
+                    "publishers": "/camera/image_raw",
+                },
+            ),
+            Component(
+                category="ROS topic",
+                name="/camera/image_raw",
+                status=ComponentStatus.OK,
+                details={
+                    "state": "AVAILABLE",
+                    "type": "sensor_msgs/msg/Image",
+                },
+            ),
+            Component(
+                category="ROS service",
+                name="/camera/get_parameters",
+                status=ComponentStatus.OK,
+                details={
+                    "state": "AVAILABLE",
+                    "type": "rcl_interfaces/srv/GetParameters",
+                },
+            ),
+            Component(
+                category="ROS action",
+                name="/navigate_to_pose",
+                status=ComponentStatus.OK,
+                details={
+                    "state": "AVAILABLE",
+                    "type": "nav2_msgs/action/NavigateToPose",
+                },
+            ),
+        ],
+        created_at=datetime(2026, 8, 10, 12, tzinfo=UTC),
         findings=[
             Finding(
                 code="HOST_RESOURCES_HEALTHY",
@@ -153,8 +350,34 @@ def test_inspect_defaults_to_local_and_writes_all_reports(
     assert "USB ID:           046d:094c" in output
     assert "Kernel drivers:   uvcvideo" in output
     assert "Access:           read-write" in output
+    assert "Probe safety:    PASSIVE" in output
+    assert "SERIAL / TTY DIAGNOSTICS" in output
+    assert "Serial device 1: Silicon Labs CP2102N USB to UART Bridge" in output
+    assert "Port:             /dev/ttyUSB0" in output
+    assert "Stable by-id:     /dev/serial/by-id/usb-Silicon_Labs" in output
+    assert "SOFTWARE STACK INVENTORY" in output
+    assert "Navigation2" in output
+    assert "CURRENT DEVICES IN USE BY ROS 2" in output
+    assert "1. Camera" in output
+    assert "2. Speaker" in output
+    assert "3. Display unit" in output
+    assert "4. Mobile base" in output
+    assert "ROS 2 SENSOR / INPUT DEVICES" not in output
+    assert "ROS 2 AUDIO DEVICES" not in output
+    assert "speaker / audio output — /speaker_node" not in output
+    assert "ROS 2 OVERVIEW" in output
+    assert "ROS distribution:   humble" in output
+    assert "ROS 2 NODES" in output
+    assert "1. /camera_node" in output
+    assert "ROS 2 TOPICS" in output
+    assert "1. /camera/image_raw" in output
+    assert "ROS 2 SERVICES" in output
+    assert "1. /camera/get_parameters" in output
+    assert "ROS 2 ACTIONS" in output
+    assert "1. /navigate_to_pose" in output
+    assert "Report timezone: America/Los_Angeles" in output
+    assert "Boot time:          2026-08-08 17:00:00 PDT" in output
     assert "Device nodes" not in output
-    assert "/dev/video0" not in output
     assert "crw-rw----" not in output
     assert "analyze" not in output
 
@@ -172,7 +395,29 @@ def test_inspect_defaults_to_local_and_writes_all_reports(
     assert "/dev/video0" in html_report
     assert "crw-rw----" in html_report
     assert "USB device-node details" in html_report
-    assert "/dev/video0" not in text_report
+    assert "Serial / TTY details" in html_report
+    assert "/dev/ttyUSB0" in html_report
+    assert '"serial_devices"' in snapshot_json
+    assert '"software_stack_inventory"' in snapshot_json
+    assert '"sensor_inventory"' in snapshot_json
+    assert '"actuator_inventory"' in snapshot_json
+    assert '"ros_device_inventory"' in snapshot_json
+    assert '"ros_runtime_inventory"' in snapshot_json
+    assert "ROS 2 overview" in html_report
+    assert "ROS 2 nodes" in html_report
+    assert "ROS 2 topics" in html_report
+    assert "ROS 2 services" in html_report
+    assert "ROS 2 actions" in html_report
+    assert "ROS 2 sensor / input devices" in html_report
+    assert "ROS 2 audio devices" in html_report
+    assert "ROS 2 displays / HMI" in html_report
+    assert "ROS 2 actuators / output devices" in html_report
+    assert "/camera/image_raw" in html_report
+    assert '"report_timezone": "America/Los_Angeles"' in snapshot_json
+    assert '"created_at": "2026-08-10T05:00:00-07:00"' in snapshot_json
+    assert "software_stacks=1" in (tmp_path / "inspection.log").read_text(encoding="utf-8")
+    assert "ros_devices=4" in (tmp_path / "inspection.log").read_text(encoding="utf-8")
+    assert "CURRENT DEVICES IN USE BY ROS 2" in text_report
 
 
 def test_agentic_mode_is_honest_about_current_scope(
@@ -198,6 +443,27 @@ def test_agentic_mode_is_honest_about_current_scope(
     output = capsys.readouterr().out
     assert "Inspection mode: agentic" in output
     assert "agent reasoning not implemented yet" in output
+
+
+def test_empty_optional_runtime_inventories_are_not_printed(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot()
+    snapshot.software_stack_inventory = []
+    snapshot.sensor_inventory = []
+    snapshot.actuator_inventory = []
+    snapshot.ros_device_inventory = []
+
+    with patch("screwdriver.cli.collect_host", return_value=snapshot):
+        assert main(["inspect", "--output", str(tmp_path)]) == 0
+
+    output = capsys.readouterr().out
+    assert "SOFTWARE STACK INVENTORY" not in output
+    assert "PHYSICAL SENSOR INVENTORY" not in output
+    assert "CURRENT DEVICES IN USE BY ROS 2" not in output
+    assert "PHYSICAL ACTUATOR / CONTROL INVENTORY" not in output
+    assert "ROS 2 OVERVIEW" in output
 
 
 def test_focus_requires_agentic_mode() -> None:

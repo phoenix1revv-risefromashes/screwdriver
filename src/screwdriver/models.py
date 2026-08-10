@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
 
+from screwdriver.report_time import REPORT_TIMEZONE_NAME, report_isoformat
+
 
 class ComponentStatus(str, Enum):
     """Represent the operational state of an inspected component."""
@@ -114,7 +116,7 @@ class OperatingSystemInfo:
             "init_system": self.init_system,
             "package_manager": self.package_manager,
             "timezone": self.timezone,
-            "boot_time": self.boot_time.isoformat(),
+            "boot_time": report_isoformat(self.boot_time),
             "uptime_seconds": self.uptime_seconds,
             "process_count": self.process_count,
         }
@@ -481,6 +483,59 @@ class USBDevice:
 
 
 @dataclass(slots=True)
+class SerialDevice:
+    """Describe one hardware-backed Linux serial/TTY port."""
+
+    port: str
+    sysfs_name: str
+    transport: str
+    driver: str | None = None
+    stable_id_path: str | None = None
+    physical_path: str | None = None
+    usb_vendor_id: str | None = None
+    usb_product_id: str | None = None
+    manufacturer: str | None = None
+    product_name: str | None = None
+    serial_number: str | None = None
+    device_node: DeviceNode | None = None
+
+    @property
+    def usb_id(self) -> str | None:
+        if self.usb_vendor_id is None or self.usb_product_id is None:
+            return None
+
+        return f"{self.usb_vendor_id}:{self.usb_product_id}"
+
+    @property
+    def display_name(self) -> str:
+        name = " ".join(part for part in (self.manufacturer, self.product_name) if part)
+        return name or self.sysfs_name
+
+    @property
+    def stable_path_available(self) -> bool:
+        return self.stable_id_path is not None
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "port": self.port,
+            "sysfs_name": self.sysfs_name,
+            "transport": self.transport,
+            "driver": self.driver,
+            "stable_id_path": self.stable_id_path,
+            "physical_path": self.physical_path,
+            "stable_path_available": self.stable_path_available,
+            "usb_id": self.usb_id,
+            "usb_vendor_id": self.usb_vendor_id,
+            "usb_product_id": self.usb_product_id,
+            "manufacturer": self.manufacturer,
+            "product_name": self.product_name,
+            "display_name": self.display_name,
+            "serial_number": self.serial_number,
+            "device_node": self.device_node.to_dict() if self.device_node else None,
+        }
+
+
+@dataclass(slots=True)
 class SystemSnapshot:
     """Represent a complete passive inspection of one Linux computer."""
 
@@ -495,7 +550,13 @@ class SystemSnapshot:
     power: PowerInfo
     network: NetworkInfo
     usb_devices: list[USBDevice] = field(default_factory=list)
-    schema_version: str = "2.0"
+    serial_devices: list[SerialDevice] = field(default_factory=list)
+    software_stack_inventory: list[Component] = field(default_factory=list)
+    sensor_inventory: list[Component] = field(default_factory=list)
+    actuator_inventory: list[Component] = field(default_factory=list)
+    ros_device_inventory: list[Component] = field(default_factory=list)
+    ros_runtime_inventory: list[Component] = field(default_factory=list)
+    schema_version: str = "3.1"
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     components: list[Component] = field(default_factory=list)
     findings: list[Finding] = field(default_factory=list)
@@ -503,7 +564,8 @@ class SystemSnapshot:
     def to_dict(self) -> dict[str, object]:
         return {
             "schema_version": self.schema_version,
-            "created_at": self.created_at.isoformat(),
+            "created_at": report_isoformat(self.created_at),
+            "report_timezone": REPORT_TIMEZONE_NAME,
             "identity": self.identity.to_dict(),
             "operating_system": self.operating_system.to_dict(),
             "platform": self.platform.to_dict(),
@@ -515,6 +577,18 @@ class SystemSnapshot:
             "power": self.power.to_dict(),
             "network": self.network.to_dict(),
             "usb_devices": [device.to_dict() for device in self.usb_devices],
+            "serial_devices": [device.to_dict() for device in self.serial_devices],
+            "software_stack_inventory": [
+                component.to_dict() for component in self.software_stack_inventory
+            ],
+            "sensor_inventory": [component.to_dict() for component in self.sensor_inventory],
+            "actuator_inventory": [component.to_dict() for component in self.actuator_inventory],
+            "ros_device_inventory": [
+                component.to_dict() for component in self.ros_device_inventory
+            ],
+            "ros_runtime_inventory": [
+                component.to_dict() for component in self.ros_runtime_inventory
+            ],
             "components": [component.to_dict() for component in self.components],
             "findings": [finding.to_dict() for finding in self.findings],
         }
