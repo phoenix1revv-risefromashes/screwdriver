@@ -242,6 +242,21 @@ def test_generic_usb_audio_class_is_not_assumed_to_be_a_microphone(
     assert result.sensors == []
 
 
+def test_observing_speaker_topic_does_not_make_node_the_physical_speaker() -> None:
+    roles = runtime._ros_device_roles(
+        "/cutie_mic_recorder",
+        ["/cutie/audio/status"],
+        ["/cutie/speaker/say"],
+        {
+            "/cutie/audio/status": "std_msgs/msg/String",
+            "/cutie/speaker/say": "std_msgs/msg/String",
+        },
+        {"mute_seconds_after_speaker_say": "4.0"},
+    )
+
+    assert all(kind != "speaker / audio output" for _class, kind, *_rest in roles)
+
+
 def test_direct_dds_fallback_recovers_graph_when_daemon_returns_empty(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

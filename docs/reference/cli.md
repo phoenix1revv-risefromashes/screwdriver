@@ -31,8 +31,11 @@ This mode:
 Generated files:
 
 ```text
-snapshot.json
-snapshot.html
+report/local/<date_timestamp>/snapshot.json
+report/local/<date_timestamp>/report.txt
+report/local/<date_timestamp>/report.html
+report/local/<date_timestamp>/inspection.log
+report/local/<date_timestamp>/report-manifest.json
 ```
 
 Running `inspect` without a mode defaults to local:
@@ -64,11 +67,25 @@ This mode:
 Generated files:
 
 ```text
-snapshot.json
-agentic-snapshot.html
+report/local/<date_timestamp>/snapshot.json
+report/local/<date_timestamp>/report.txt
+report/local/<date_timestamp>/report.html
+report/local/<date_timestamp>/inspection.log
+report/agentic/<same_date_timestamp>/compact_snapshot.html
+report/agentic/<same_date_timestamp>/system-blueprint.html
+report/agentic/<same_date_timestamp>/diagnostic-report.html
+report/agentic/<same_date_timestamp>/agent-analysis.json
 ```
 
-The complete `snapshot.json` remains local. Only selected and redacted evidence may be sent to the configured AI provider.
+The compact snapshot contains only the operationally useful overview: evidence
+state, working checks, actionable findings, unknowns, next check, data flow, and
+coverage. The blueprint and diagnostic report retain the detailed engineering
+evidence. Provider availability is report-generation metadata, not robot health.
+
+The complete `snapshot.json` remains local. Agentic analysis supports Anthropic and
+OpenAI. API keys are read from `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` and are never
+stored in a report. The evidence view removes machine IDs, serial numbers, MAC
+addresses, and the default gateway before model analysis.
 
 A focused inspection can be requested with:
 
@@ -77,7 +94,9 @@ screwdriver inspect --agentic \
   --focus "camera, networking, and ROS 2"
 ```
 
-The agentic inspection explains what is installed and how components relate. It does not diagnose faults or recommend fixes.
+The system blueprint explains what is installed and how components relate. The
+diagnostic report separately explains observed problems, likely causes, ordered
+solution approaches, diagnostic commands, and measurable success criteria.
 
 ### Options
 
@@ -86,12 +105,18 @@ The agentic inspection explains what is installed and how components relate. It 
 | `--local` | Perform a complete offline inspection |
 | `--agentic` | Produce an AI-organized inspection |
 | `--focus TEXT` | Focus agentic inspection on selected areas |
-| `--output PATH` | Select the output directory |
-| `--format FORMAT` | Select `json`, `html`, or `all` |
-| `--no-redact` | Disable redaction for local output only |
-| `--verbose` | Display detailed inspection progress |
+| `--output PATH` | Select the report root containing `local/` and `agentic/` |
+| `--provider anthropic\|openai\|none` | Select Anthropic, OpenAI, or deterministic analysis |
+| `--model MODEL` | Select a provider model (defaults: `claude-sonnet-5` or `gpt-5.6-terra`) |
+| `--effort light\|medium\|high` | Balance provider reasoning and token use (default `medium`) |
+| `--investigate` | Permit the closed catalog of extra read-only probes |
 
 `--local` and `--agentic` are mutually exclusive.
+
+`light` maps to each provider's API value `low`. Claude Sonnet 5 and GPT-5.6
+Terra accept all three exposed levels. Other compatible structured-output models
+remain selectable. If one rejects the effort parameter, Screwdriver retries the
+request once without effort and records that the model's native default was used.
 
 ## `screwdriver analyze`
 
@@ -116,16 +141,24 @@ The command:
 Generated files:
 
 ```text
-analysis-report.json
-analysis-report.html
+report/agentic/<date_timestamp>/compact_snapshot.html
+report/agentic/<date_timestamp>/system-blueprint.html
+report/agentic/<date_timestamp>/diagnostic-report.html
+report/agentic/<date_timestamp>/agent-analysis.json
 ```
 
 Example:
 
 ```bash
 screwdriver analyze snapshot.json \
-  --output reports/analysis
+  --output report
 ```
+
+`--investigate` authorizes at most four additional probes chosen from a closed
+catalog. Probe arguments are validated, commands run without a shell, output and
+execution time are bounded, and probes only run when the snapshot hostname
+matches the current computer. Invalid probe requests are recorded as rejected
+instead of silently disappearing.
 
 ## Command boundaries
 

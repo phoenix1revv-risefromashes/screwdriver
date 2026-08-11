@@ -1,0 +1,245 @@
+{
+  "source_snapshot": "report/local/2026-08-11_06-46-42/snapshot.json",
+  "scan_id": "2026-08-11_06-46-42",
+  "snapshot_sha256": "eb7ec1a87b8e2c16a4c40047c85c068f9bcf4d22420a9a5d09f9ff0c7889da88",
+  "provider": "anthropic",
+  "model": "claude-sonnet-5",
+  "requested_effort": "medium",
+  "provider_status": "Anthropic model claude-sonnet-5 (effort medium)",
+  "provider_request": {
+    "request_id": "msg_011Cdw4gYCJDp7Nt4UREuVJD",
+    "input_tokens": 16533,
+    "output_tokens": 8761,
+    "duration_ms": 102939,
+    "api_effort": "medium",
+    "used_model_default_effort": false
+  },
+  "focus": null,
+  "summary": "Snapshot is from a Jetson Orin Nano Super (cutie) running Ubuntu 22.04/L4T 36.5.2 acting as a robot compute node. ROS 2 Humble is installed but not sourced or running, so the live ROS graph is empty (0 nodes/topics) and no ROS-based device or actuator inventory could be captured. Physical peripherals visible via USB/serial enumeration include an STM32 STLink debug probe (ttyACM0), a Silicon Labs CP2102N UART bridge (ttyUSB0), a Seeed reSpeaker 4-mic USB audio array, a Realtek Bluetooth radio, and an unidentified QDtech MPI5001 HID device. Networking shows a wired Ethernet link as the default route, Wi-Fi and CAN interfaces administratively down, and two USB-gadget network links up. Docker is running; CUDA, colcon, rosdep, vcstool are installed. Memory usage is moderate (58%) but swap usage is comparatively high (43.7%). No actuator inventory or ROS device inventory entries exist, consistent with the ROS stack being installed but never launched in this snapshot rather than evidence of missing hardware.",
+  "overall_evidence_state": "ATTENTION NEEDED",
+  "highest_priority_next_check": "Confirm with the operator whether ROS 2 nodes are expected to be running at this time before treating this as a fault.",
+  "successful_checks": [
+    "CPU snapshot is below the warning threshold (0.0%).",
+    "Memory snapshot is below the warning threshold (58.2%).",
+    "No collected filesystem is at or above 90% usage.",
+    "All collected thermal readings are below their reported critical limits.",
+    "Default network route is present on enP8p1s0."
+  ],
+  "collection_coverage": [
+    {
+      "area": "Host / OS",
+      "state": "COLLECTED",
+      "source": "identity, operating_system, platform"
+    },
+    {
+      "area": "Compute / memory",
+      "state": "COLLECTED",
+      "source": "cpu, memory"
+    },
+    {
+      "area": "Storage",
+      "state": "COLLECTED",
+      "source": "storage_devices"
+    },
+    {
+      "area": "Thermals / power",
+      "state": "COLLECTED",
+      "source": "thermal_sensors, power"
+    },
+    {
+      "area": "Network",
+      "state": "COLLECTED",
+      "source": "network"
+    },
+    {
+      "area": "USB / serial",
+      "state": "COLLECTED",
+      "source": "usb_devices, serial_devices"
+    },
+    {
+      "area": "Robotics software",
+      "state": "COLLECTED",
+      "source": "software_stack_inventory"
+    },
+    {
+      "area": "ROS 2 runtime",
+      "state": "COLLECTED",
+      "source": "ros_runtime_inventory"
+    },
+    {
+      "area": "ROS \u2194 hardware mapping",
+      "state": "NOT AVAILABLE",
+      "source": "ros_device_inventory"
+    }
+  ],
+  "architecture_observations": [
+    "Single Jetson Orin Nano Super module serves as the onboard compute/robot controller (board_name Jetson, L4T 36.5.2, MAXN_SUPER power mode).",
+    "ROS 2 Humble is installed (197 indexed packages) but the environment is not sourced and no ROS 2 processes are running, so ros_runtime_inventory reports an UNAVAILABLE graph with 0 nodes/topics/services/actions \u2014 this reflects an inactive runtime, not necessarily an application fault.",
+    "robot_state_publisher, colcon, rosdep, vcstool, and CUDA toolkit are installed, suggesting a colcon/ROS2-based robotics workspace is intended to run on this host, but no build/runtime artifacts are exposed in this snapshot.",
+    "Peripheral hardware is exposed purely through Linux device/USB enumeration (serial_devices, usb_devices, sensor_inventory) rather than through ROS topics/nodes, since no ROS graph is active \u2014 so ownership of these devices by any particular ROS node cannot be established from this snapshot alone.",
+    "Two independent USB controllers are populated: a USB2 hub tree (bus 1) carrying the STLink probe, CP210x bridge, Bluetooth radio, reSpeaker mic array, and QDtech MPI5001 HID device; and an empty USB3 hub tree (bus 2) with no attached peripheral devices reported.",
+    "Networking is anchored on wired Ethernet (enP8p1s0, 1000 Mbps full duplex, default route, internet reachable) while Wi-Fi (wlP1p1s0) and CAN (can0) interfaces exist but are administratively down; two USB-gadget interfaces (usb0/usb1) are up without IPv4 addresses, and docker0 is present due to the running Docker service.",
+    "Memory is at 58.2% used with swap 43.7% used \u2014 a moderate combined memory pressure signal worth watching but not yet a confirmed fault given no process-level breakdown is available."
+  ],
+  "unknowns": [
+    "Whether ttyUSB0 (CP2102N UART bridge) is required by an active robot service, or is an idle/optional peripheral \u2014 permission denial alone does not establish operational necessity.",
+    "The functional role of the QDtech MPI5001 USB HID device (e.g., touchscreen, controller, or diagnostic panel) \u2014 no descriptive metadata beyond USB IDs is present.",
+    "Whether can0 being down is expected (CAN bus unused in this configuration) or represents a disconnected/misconfigured actuator communication link \u2014 no expected_state evidence ties CAN to a required subsystem.",
+    "Whether wlP1p1s0 (Wi-Fi) being down is an intentional design choice (wired-primary network) or an unintended regression, since no expected_state data confirms Wi-Fi is required.",
+    "Purpose of usb0/usb1 USB-gadget network interfaces being up without addresses \u2014 could be an unused peripheral tethering path or an incompletely configured link.",
+    "Root cause of elevated swap usage (43.7%) \u2014 no per-process memory data is available to determine whether this is due to a leaking process, expected buffering, or historical peak usage.",
+    "Whether the reSpeaker mic array (marked PRESENT_NOT_EXERCISED) is meant to be actively used by any ROS audio pipeline, since no ROS audio node/topic evidence exists in the (currently empty) graph."
+  ],
+  "issues": [
+    {
+      "code": "SERIAL_ACCESS_INCOMPLETE",
+      "title": "Current user lacks read-write access to /dev/ttyUSB0.",
+      "severity": "INFO",
+      "confidence": 95,
+      "classification": "NEEDS_CONFIRMATION",
+      "observation_confidence": 100,
+      "diagnosis_confidence": 70,
+      "expected_state": "Only serial interfaces required by the robot profile or runtime need stable, read-write access.",
+      "operational_impact": "No operational impact is proven until the operator confirms this component is required.",
+      "evidence_references": [
+        "findings[0]"
+      ],
+      "evidence_level": "VERIFIED",
+      "observed": [
+        "permissions=crw-rw----, owner=root:dialout, access=denied"
+      ],
+      "probable_causes": [
+        "Serial identity, driver binding, permissions, or port ownership inconsistency."
+      ],
+      "primary_approach": [
+        "Confirm that this serial interface is required before changing permissions or identity rules."
+      ],
+      "alternative_approaches": [],
+      "diagnostic_commands": [
+        "udevadm info --query=property --name /dev/ttyUSB0.",
+        "lsof -- /dev/ttyUSB0."
+      ],
+      "success_criteria": [
+        "The intended process can identify and access the stable serial device without contention."
+      ]
+    },
+    {
+      "code": "ROS_ENVIRONMENT_NOT_SOURCED",
+      "title": "ROS 2 Humble installed but shell environment not sourced",
+      "severity": "MEDIUM",
+      "confidence": 95,
+      "classification": "CONFIGURATION_WARNING",
+      "observation_confidence": 100,
+      "diagnosis_confidence": 70,
+      "expected_state": "If ROS 2-based robot software is expected to run on this host, the shell/service environment should have ROS_DISTRO, AMENT/COLCON overlays, and RMW configuration sourced so ros2 CLI and node discovery function.",
+      "operational_impact": "No live ROS graph can be inspected or is running; any robot application depending on ROS 2 topics/services/actions is currently not operating from this snapshot's perspective.",
+      "evidence_references": [
+        "findings[1]"
+      ],
+      "evidence_level": "VERIFIED",
+      "observed": [
+        "ROS installation detected=true, environment_sourced=false, active_distribution=null, running=false, state=INSTALLED",
+        "Installed distributions: humble"
+      ],
+      "probable_causes": [
+        "Systemd services or launch scripts not configured to source /opt/ros/humble/setup.bash before executing ROS 2 processes.",
+        "ROS 2 stack intentionally not started at time of snapshot capture."
+      ],
+      "primary_approach": [
+        "Confirm with the operator whether ROS 2 nodes are expected to be running at this time before treating this as a fault.",
+        "If expected to run, verify service/unit files or startup scripts source the ROS 2 environment prior to node execution."
+      ],
+      "alternative_approaches": [
+        [
+          "Check systemd service definitions for ExecStart lines lacking environment sourcing.",
+          "Review container/Docker entrypoints since Docker is running \u2014 ROS nodes may be intended to run inside containers with their own sourcing."
+        ]
+      ],
+      "diagnostic_commands": [
+        "ros2 node list",
+        "ros2 topic list -t"
+      ],
+      "success_criteria": [
+        "ROS 2 environment variables (ROS_DISTRO, RMW_IMPLEMENTATION) are set in the intended execution context.",
+        "ros2 node/topic list return expected entries once environment and processes are active (subject to operator confirmation of intended state)."
+      ]
+    },
+    {
+      "code": "ROS_RUNTIME_UNAVAILABLE",
+      "title": "Live ROS 2 graph inspection unavailable / empty graph",
+      "severity": "INFO",
+      "confidence": 70,
+      "classification": "NEEDS_CONFIRMATION",
+      "observation_confidence": 90,
+      "diagnosis_confidence": 45,
+      "expected_state": "If a robot application is intended to be active, the ROS 2 graph should show non-zero nodes/topics matching the deployed robot stack.",
+      "operational_impact": "No ROS-level visibility into nodes, topics, services, or actions; downstream diagnosis of any ROS-based subsystem (motion, sensors, control) cannot proceed until the graph is queryable.",
+      "evidence_references": [
+        "findings[5]"
+      ],
+      "evidence_level": "VERIFIED",
+      "observed": [
+        "state=UNAVAILABLE, nodes=0, topics=0, services=0, actions=0, discovery_mode=unavailable, environment_recovered=false"
+      ],
+      "probable_causes": [
+        "Downstream effect of ROS environment not being sourced (see ROS_ENVIRONMENT_NOT_SOURCED).",
+        "No ROS 2 processes launched at time of snapshot."
+      ],
+      "primary_approach": [
+        "Confirm with the operator whether any ROS 2 nodes should be active at snapshot time.",
+        "If yes, request ros_node_info / ros_topic_info probes after confirming environment is sourced in the target shell/service context."
+      ],
+      "alternative_approaches": [
+        [
+          "Inspect systemd/container service status for any ROS-launching units before assuming absence of graph reflects a fault."
+        ]
+      ],
+      "diagnostic_commands": [
+        "ros2 node list",
+        "ros2 topic list -t"
+      ],
+      "success_criteria": [
+        "ros_node_info and ros_topic_info return a non-empty, expected node/topic set consistent with the intended robot software configuration."
+      ]
+    },
+    {
+      "code": "ELEVATED_SWAP_USAGE",
+      "title": "Swap usage elevated at 43.7% while physical memory usage is 58.2%",
+      "severity": "LOW",
+      "confidence": 60,
+      "classification": "ADVISORY",
+      "observation_confidence": 100,
+      "diagnosis_confidence": 40,
+      "expected_state": "Under normal operation with 3.3GB of available physical memory remaining, swap usage would typically remain low unless memory pressure events have occurred.",
+      "operational_impact": "Potential indicator of past or recurring memory pressure; could contribute to latency in memory-intensive robotics/vision workloads if swapping occurs during active operation, though no confirmed performance impact is evidenced here.",
+      "evidence_references": [
+        "memory.swap_used_bytes",
+        "memory.swap_usage_percent",
+        "memory.usage_percent"
+      ],
+      "evidence_level": "VERIFIED",
+      "observed": [
+        "memory usage_percent=58.2, swap_usage_percent=43.7, swap_used_bytes=1743257600 of swap_total_bytes=3988414464"
+      ],
+      "probable_causes": [
+        "A memory-intensive process consumed swap earlier in the current uptime (44183s ~12.3h) and has not released it.",
+        "zram-backed swap devices (zram0-5) are in active use as part of normal Jetson memory management tuning."
+      ],
+      "primary_approach": [
+        "Treat as advisory; monitor for correlation with performance degradation before further action.",
+        "Confirm with operator whether this swap level is typical baseline for this deployment or a recent change."
+      ],
+      "alternative_approaches": [
+        [
+          "Review process-level memory consumption history if available through other tooling (not covered by allowed probes here)."
+        ]
+      ],
+      "diagnostic_commands": [],
+      "success_criteria": [
+        "No OOM-kill or memory-pressure kernel log entries correlate with current uptime, or operator confirms this swap level is expected baseline."
+      ]
+    }
+  ],
+  "read_only_probes": [],
+  "repairs_executed": false
+}
