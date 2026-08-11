@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from screwdriver.cli import main
+from screwdriver.cli import build_parser, main
 from screwdriver.models import (
     Component,
     ComponentStatus,
@@ -382,14 +382,18 @@ def test_inspect_defaults_to_local_and_writes_all_reports(
     assert "crw-rw----" not in output
     assert "analyze" not in output
 
-    assert (tmp_path / "snapshot.json").is_file()
-    assert (tmp_path / "report.txt").is_file()
-    assert (tmp_path / "report.html").is_file()
-    assert (tmp_path / "inspection.log").is_file()
+    local_runs = list((tmp_path / "local").iterdir())
+    assert len(local_runs) == 1
+    run = local_runs[0]
+    assert (run / "snapshot.json").is_file()
+    assert (run / "report.txt").is_file()
+    assert (run / "report.html").is_file()
+    assert (run / "inspection.log").is_file()
+    assert (run / "report-manifest.json").is_file()
 
-    snapshot_json = (tmp_path / "snapshot.json").read_text(encoding="utf-8")
-    html_report = (tmp_path / "report.html").read_text(encoding="utf-8")
-    text_report = (tmp_path / "report.txt").read_text(encoding="utf-8")
+    snapshot_json = (run / "snapshot.json").read_text(encoding="utf-8")
+    html_report = (run / "report.html").read_text(encoding="utf-8")
+    text_report = (run / "report.txt").read_text(encoding="utf-8")
 
     assert "/dev/video0" in snapshot_json
     assert '"permissions": "crw-rw----"' in snapshot_json
@@ -416,12 +420,12 @@ def test_inspect_defaults_to_local_and_writes_all_reports(
     assert "/camera/image_raw" in html_report
     assert '"report_timezone": "America/Los_Angeles"' in snapshot_json
     assert '"created_at": "2026-08-10T05:00:00-07:00"' in snapshot_json
-    assert "software_stacks=1" in (tmp_path / "inspection.log").read_text(encoding="utf-8")
-    assert "ros_devices=4" in (tmp_path / "inspection.log").read_text(encoding="utf-8")
+    assert "software_stacks=1" in (run / "inspection.log").read_text(encoding="utf-8")
+    assert "ros_devices=4" in (run / "inspection.log").read_text(encoding="utf-8")
     assert "CURRENT DEVICES IN USE BY ROS 2" in text_report
 
 
-def test_agentic_mode_generates_two_reports(
+def test_agentic_mode_separates_local_and_agentic_report_sets(
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
 ) -> None:
@@ -446,11 +450,80 @@ def test_agentic_mode_generates_two_reports(
     output = capsys.readouterr().out
     assert "Inspection mode: agentic" in output
     assert "System blueprint:" in output
+    assert "Compact snapshot:" in output
     assert "Diagnostic report:" in output
     assert "Problems reported:" in output
-    assert (tmp_path / "system-blueprint.html").is_file()
-    assert (tmp_path / "diagnostic-report.html").is_file()
-    assert (tmp_path / "agent-analysis.json").is_file()
+    local_runs = list((tmp_path / "local").iterdir())
+    agentic_runs = list((tmp_path / "agentic").iterdir())
+    assert len(local_runs) == len(agentic_runs) == 1
+    assert local_runs[0].name == agentic_runs[0].name
+    assert (local_runs[0] / "snapshot.json").is_file()
+    assert (agentic_runs[0] / "compact_snapshot.html").is_file()
+    assert (agentic_runs[0] / "system-blueprint.html").is_file()
+    assert (agentic_runs[0] / "diagnostic-report.html").is_file()
+    assert (agentic_runs[0] / "agent-analysis.json").is_file()
+    assert (agentic_runs[0] / "report-manifest.json").is_file()
+
+
+def test_repeated_inspections_never_overwrite_timestamped_runs(tmp_path: Path) -> None:
+    snapshot = _snapshot()
+    with patch("screwdriver.cli.collect_host", return_value=snapshot):
+        assert main(["inspect", "--output", str(tmp_path)]) == 0
+        assert main(["inspect", "--output", str(tmp_path)]) == 0
+
+    runs = sorted(path.name for path in (tmp_path / "local").iterdir())
+    assert runs == ["2026-08-10_05-00-00", "2026-08-10_05-00-00_01"]
+    assert all((tmp_path / "local" / run / "snapshot.json").is_file() for run in runs)
+
+
+def test_agentic_cli_accepts_anthropic_and_openai_provider_model_pairs() -> None:
+    parser = build_parser()
+
+    anthropic = parser.parse_args(
+        [
+            "inspect",
+            "--agentic",
+            "--provider",
+            "anthropic",
+            "--model",
+            "claude-sonnet-5",
+            "--effort",
+            "high",
+        ]
+    )
+    openai = parser.parse_args(
+        [
+            "inspect",
+            "--agentic",
+            "--provider",
+            "openai",
+            "--model",
+            "gpt-5.4",
+            "--effort",
+            "light",
+        ]
+    )
+
+    assert (anthropic.provider, anthropic.model, anthropic.effort) == (
+        "anthropic",
+        "claude-sonnet-5",
+        "high",
+    )
+    assert (openai.provider, openai.model, openai.effort) == (
+        "openai",
+        "gpt-5.4",
+        "light",
+    )
+
+
+def test_agentic_cli_exposes_only_light_medium_and_high_effort() -> None:
+    parser = build_parser()
+
+    assert parser.parse_args(["inspect", "--agentic"]).effort == "medium"
+    with pytest.raises(SystemExit) as error:
+        parser.parse_args(["inspect", "--agentic", "--effort", "low"])
+
+    assert error.value.code == 2
 
 
 def test_empty_optional_runtime_inventories_are_not_printed(
@@ -488,7 +561,7 @@ def test_focus_requires_agentic_mode() -> None:
     assert error.value.code == 2
 
 
-def test_analyze_existing_snapshot_generates_two_reports(
+def test_analyze_existing_snapshot_generates_timestamped_agentic_reports(
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
 ) -> None:
@@ -515,6 +588,9 @@ def test_analyze_existing_snapshot_generates_two_reports(
     output = capsys.readouterr().out
     assert "SCREWDRIVER AGENTIC ANALYSIS" in output
     assert "Repairs executed:  no" in output
-    assert (output_path / "system-blueprint.html").is_file()
-    assert (output_path / "diagnostic-report.html").is_file()
-    assert (output_path / "agent-analysis.json").is_file()
+    runs = list((output_path / "agentic").iterdir())
+    assert len(runs) == 1
+    assert (runs[0] / "compact_snapshot.html").is_file()
+    assert (runs[0] / "system-blueprint.html").is_file()
+    assert (runs[0] / "diagnostic-report.html").is_file()
+    assert (runs[0] / "agent-analysis.json").is_file()

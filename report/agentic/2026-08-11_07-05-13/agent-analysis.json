@@ -1,0 +1,177 @@
+{
+  "source_snapshot": "report/local/2026-08-11_07-05-13/snapshot.json",
+  "scan_id": "2026-08-11_07-05-13",
+  "snapshot_sha256": "b4994d3e47070b69fc210228a126712adf42e7315f3db2f17e764e815e3898ed",
+  "provider": "anthropic",
+  "model": "claude-sonnet-5",
+  "requested_effort": "medium",
+  "provider_status": "Anthropic model claude-sonnet-5 (effort medium)",
+  "provider_request": {
+    "request_id": "msg_011Cdw671kXbmAZ7k8AJMcBr",
+    "input_tokens": 17817,
+    "output_tokens": 9385,
+    "duration_ms": 99839,
+    "api_effort": "medium",
+    "used_model_default_effort": false
+  },
+  "focus": null,
+  "summary": "Snapshot is from 'cutie', a Jetson Orin Nano Super (JetPack 36.5.2, ROS 2 Humble) robot with a live ROS graph reporting 7 topics and 12 services under two apparent node namespaces (cutie_llm, cutie_speaker) but zero enumerated nodes, plus a set of USB-attached peripherals (STM32 STLink/mbed board on ttyACM0, CP2102N UART bridge on ttyUSB0, a reSpeaker XVF3800 4-mic USB array, an unidentified QDtech MPI5001 HID device, and Bluetooth radio). Networking shows a wired Ethernet default route up, Wi-Fi and CAN interfaces down, and two USB-gadget network interfaces up without IP addresses. No actuator inventory or camera devices were enumerated. All observed conditions are informational/advisory; no hardware fault has been directly verified from this passive snapshot.",
+  "overall_evidence_state": "NO CONFIRMED FAILURE \u00b7 COVERAGE PARTIAL",
+  "highest_priority_next_check": "Whether any ROS node is currently bound to /dev/ttyACM0 (STM32/mbed) or /dev/ttyUSB0 (CP2102N) \u2014 no publisher/subscriber or parameter-service linkage to these serial ports was captured.",
+  "successful_checks": [
+    "CPU snapshot is below the warning threshold (0.0%).",
+    "Memory snapshot is below the warning threshold (60.2%).",
+    "No collected filesystem is at or above 90% usage.",
+    "ROS 2 graph discovery succeeded (0 nodes, 7 topics).",
+    "Default network route is present on enP8p1s0."
+  ],
+  "collection_coverage": [
+    {
+      "area": "Host / OS",
+      "state": "COLLECTED",
+      "source": "identity, operating_system, platform"
+    },
+    {
+      "area": "Compute / memory",
+      "state": "COLLECTED",
+      "source": "cpu, memory"
+    },
+    {
+      "area": "Storage",
+      "state": "COLLECTED",
+      "source": "storage_devices"
+    },
+    {
+      "area": "Thermals / power",
+      "state": "COLLECTED",
+      "source": "thermal_sensors, power"
+    },
+    {
+      "area": "Network",
+      "state": "COLLECTED",
+      "source": "network"
+    },
+    {
+      "area": "USB / serial",
+      "state": "COLLECTED",
+      "source": "usb_devices, serial_devices"
+    },
+    {
+      "area": "Robotics software",
+      "state": "COLLECTED",
+      "source": "software_stack_inventory"
+    },
+    {
+      "area": "ROS 2 runtime",
+      "state": "COLLECTED",
+      "source": "ros_runtime_inventory"
+    },
+    {
+      "area": "ROS \u2194 hardware mapping",
+      "state": "NOT AVAILABLE",
+      "source": "ros_device_inventory"
+    }
+  ],
+  "architecture_observations": [
+    "Robot identity 'cutie' runs ROS 2 Humble with ROS_DOMAIN_ID=0 and default RMW; the graph was recovered from an already-running process rather than the operator's shell environment.",
+    "Topic names (/cutie/brain/status, /cutie/speaker/say, /cutie/speaker/status, /cutie/speech/text, /cutie/response/text) plus parameter services under /cutie_llm and /cutie_speaker indicate at least an LLM/brain node and a speaker node are intended to exist in the graph, even though 'nodes':0 was reported.",
+    "The reSpeaker XVF3800 4-mic USB array is the most likely physical backing for /cutie/speech/text (input) and /cutie/speaker/* (output) topics, based on naming correlation only \u2014 no direct ROS-to-device binding was captured.",
+    "An STMicroelectronics STM32 STLink board (ttyACM0, mbed drive, tiny 1.6MB block device 'sda') is present and read/write accessible to plugdev group; this is a common motor-controller/firmware-programming interface but no ROS driver reference confirms its role.",
+    "A Silicon Labs CP2102N USB-UART bridge (ttyUSB0) is present but not accessible to the current user (dialout group only); its consumer (if any) is not identified in the ROS graph or elsewhere in the snapshot.",
+    "A CAN interface (can0, mttcan driver) exists but is administratively down and MTU 16 (classic CAN framing), with no referencing ROS node or service \u2014 plausible drivetrain/actuator bus that is either unused or not yet brought up.",
+    "Two USB-gadget network interfaces (usb0, usb1) are up but carry no IPv4 address, and l4tbr0 (bridge) is down \u2014 suggests a host-tethering or inter-board USB network path that may be partially configured.",
+    "Wi-Fi (rtl88x2ce) is down while wired Ethernet (r8168, enP8p1s0) is the active default route \u2014 consistent with a docked/lab configuration rather than a fault.",
+    "The QDtech MPI5001 HID device (vendor 0484:5750) has no corresponding entry in sensor/actuator inventories or ROS topics; its function is unknown from this snapshot (name suggests a possible display/touch controller).",
+    "Storage, thermal, memory, and CPU metrics are all within normal operating bounds for this platform; swap usage (43.6%) is elevated but not yet at a level indicating pressure."
+  ],
+  "unknowns": [
+    "Whether any ROS node is currently bound to /dev/ttyACM0 (STM32/mbed) or /dev/ttyUSB0 (CP2102N) \u2014 no publisher/subscriber or parameter-service linkage to these serial ports was captured.",
+    "The physical/functional purpose of the QDtech MPI5001 HID device and whether it is required by the robot profile.",
+    "Why the ROS graph reports 12 services under /cutie_llm and /cutie_speaker parameter-service namespaces yet 0 discovered nodes and 0 'detailed_nodes' \u2014 could be a discovery/daemon caching artifact or an environment/domain mismatch between the snapshot tool and the running graph.",
+    "Whether the CAN bus (can0) and USB-gadget network interfaces (usb0/usb1) are required for this robot's normal operation or are simply unused/reserved paths.",
+    "Whether the reSpeaker XVF3800 is actually the audio backend for the /cutie/speech and /cutie/speaker topics, or if that mapping is coincidental naming."
+  ],
+  "issues": [
+    {
+      "code": "SERIAL_ACCESS_INCOMPLETE",
+      "title": "Current user/process lacks read-write access to /dev/ttyUSB0 (CP2102N USB-UART)",
+      "severity": "INFO",
+      "confidence": 95,
+      "classification": "NEEDS_CONFIRMATION",
+      "observation_confidence": 100,
+      "diagnosis_confidence": 60,
+      "expected_state": "Only serial interfaces required by the active robot profile or ROS runtime need stable read-write access; unused ports may legitimately remain access-restricted.",
+      "operational_impact": "No operational impact is proven; impact depends entirely on whether any running process (e.g., a microcontroller/actuator driver) needs this port, which is not confirmed in this snapshot.",
+      "evidence_references": [
+        "findings[0]"
+      ],
+      "evidence_level": "VERIFIED",
+      "observed": [
+        "permissions=crw-rw----, owner=root:dialout, access=denied for /dev/ttyUSB0 and related /dev/char/188:0 node",
+        "No ROS topic, service, or node reference to ttyUSB0 or the CP2102N device was found in the snapshot"
+      ],
+      "probable_causes": [
+        "The invoking user/process is not a member of the 'dialout' group.",
+        "The port is intentionally unused at this time (no consumer configured).",
+        "A udev rule granting broader access (e.g., plugdev) was not applied for this specific device."
+      ],
+      "primary_approach": [
+        "Confirm whether any ROS node, service, or startup script is expected to use /dev/ttyUSB0 before considering any permission change.",
+        "Inspect device ownership and any process currently holding or attempting to open the port via read-only probes."
+      ],
+      "alternative_approaches": [
+        [
+          "Check udev rules and group memberships for the operator account via device_metadata/port_owner probes to understand why this port differs in permission model from ttyACM0 (which is plugdev, read-write)."
+        ]
+      ],
+      "diagnostic_commands": [
+        "udevadm info --query=property --name /dev/ttyUSB0.",
+        "lsof -- /dev/ttyUSB0."
+      ],
+      "success_criteria": [
+        "It is confirmed whether /dev/ttyUSB0 is required by any active or intended robot function.",
+        "If required, the responsible process can open the port without permission denial (verified via port_owner/service_status, not by executing repairs)."
+      ]
+    },
+    {
+      "code": "ROS_ENVIRONMENT_NOT_SOURCED",
+      "title": "ROS installed but current shell/session not sourced; graph recovered indirectly",
+      "severity": "INFO",
+      "confidence": 95,
+      "classification": "ADVISORY",
+      "observation_confidence": 100,
+      "diagnosis_confidence": 70,
+      "expected_state": "The configured ROS environment (ROS_DISTRO, ROS_DOMAIN_ID, RMW_IMPLEMENTATION) should be consistently sourced for the operator's session to guarantee deterministic discovery.",
+      "operational_impact": "Discovery performed by recovering environment variables from an already-running process; this is functional but means any operator-run ROS CLI commands in an unsourced shell may not see the same graph.",
+      "evidence_references": [
+        "findings[1]"
+      ],
+      "evidence_level": "VERIFIED",
+      "observed": [
+        "environment_sourced=false, active_distribution=null, ros2_executable=null",
+        "Live graph was recovered using ROS_DISTRO=humble, ROS_DOMAIN_ID=0, RMW_IMPLEMENTATION=default from a running process"
+      ],
+      "probable_causes": [
+        "No .bashrc/.profile sourcing of the ROS underlay in the operator's shell.",
+        "Deliberate container/service-managed ROS runtime separate from the operator's interactive shell."
+      ],
+      "primary_approach": [
+        "Before running any interactive ROS diagnostic commands, source the same ROS underlay/workspace and domain settings recovered by the runtime (ROS_DISTRO=humble, ROS_DOMAIN_ID=0) to ensure consistent discovery."
+      ],
+      "alternative_approaches": [
+        [
+          "Use ros_param_list and ros_node_info probes against the already-running process's environment rather than relying on a freshly sourced shell, to avoid introducing a second, potentially mismatched discovery domain."
+        ]
+      ],
+      "diagnostic_commands": [
+        "ros2 node list",
+        "ros2 topic list -t"
+      ],
+      "success_criteria": [
+        "Ros2 CLI commands run in an operator shell return the same topic/service/node counts as the recovered runtime graph."
+      ]
+    }
+  ],
+  "read_only_probes": [],
+  "repairs_executed": false
+}

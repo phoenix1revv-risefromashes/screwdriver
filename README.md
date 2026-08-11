@@ -27,18 +27,71 @@ screwdriver inspect --agentic
 
 Collects the same system evidence, then generates:
 
+* `compact_snapshot.html` — a findings-first, one-minute operational view
 * `system-blueprint.html` — a detailed, organized map of the robotic system
 * `diagnostic-report.html` — failures, likely causes, and step-by-step solutions
-* `agent-analysis.json` — the structured evidence behind both reports
+* `agent-analysis.json` — validated structured evidence behind all three reports
+
+Every run is isolated and never overwrites an older report:
+
+```text
+report/
+├── local/<date_timestamp>/
+│   ├── snapshot.json
+│   ├── report.txt
+│   ├── report.html
+│   ├── inspection.log
+│   └── report-manifest.json
+└── agentic/<same_date_timestamp>/
+    ├── compact_snapshot.html
+    ├── system-blueprint.html
+    ├── diagnostic-report.html
+    ├── agent-analysis.json
+    └── report-manifest.json
+```
 
 By default, Screwdriver uses Anthropic Claude Sonnet 5 and falls back to deterministic
-reporting if the API is unavailable. The API key is read only from the
-`ANTHROPIC_API_KEY` environment variable and is never written to reports.
+reporting if the API is unavailable. Provider API keys are read only from environment
+variables and are never written to reports.
 
 ```bash
 export ANTHROPIC_API_KEY="your-new-key"
 screwdriver inspect --agentic
 ```
+
+Choose Anthropic or OpenAI explicitly:
+
+```bash
+export ANTHROPIC_API_KEY="your-key"
+screwdriver inspect --agentic --provider anthropic --model claude-sonnet-5
+
+export OPENAI_API_KEY="your-key"
+screwdriver inspect --agentic --provider openai --model gpt-5.6-terra
+```
+
+These are the optimized defaults, so `--model` can be omitted after selecting a
+provider. Any other text model that supports the provider's structured-output
+request can still be supplied with `--model`.
+
+Control the quality, latency, and token tradeoff with the same public vocabulary
+for both providers:
+
+```bash
+screwdriver inspect --agentic \
+  --provider anthropic \
+  --model claude-sonnet-5 \
+  --effort medium
+
+screwdriver inspect --agentic \
+  --provider openai \
+  --model gpt-5.6-terra \
+  --effort medium
+```
+
+Accepted effort values are `light`, `medium`, and `high`. `light` is translated
+to the providers' API value `low`. If another otherwise-compatible model rejects
+the effort setting, Screwdriver retries once without that setting and uses the
+model's native default.
 
 ```bash
 screwdriver inspect --agentic --focus "camera and ROS 2"
@@ -50,9 +103,10 @@ Allow the agent to request a bounded set of additional read-only checks:
 screwdriver inspect --agentic --investigate
 ```
 
-The investigation catalog contains metadata-only checks such as `ros2 node info`,
+The investigation catalog contains validated metadata-only checks such as `ros2 node info`,
 `ros2 topic info --verbose`, `udevadm info`, `lsof`, and recent kernel logs. It
-does not accept arbitrary commands.
+does not accept arbitrary commands. Rejected requests, exit codes, stdout, stderr,
+duration, and truncation state remain visible in the diagnostic evidence.
 
 ### Analyze
 

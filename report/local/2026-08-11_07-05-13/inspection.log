@@ -1,0 +1,13 @@
+created_at=2026-08-11T07:05:13.323725-07:00
+hostname=cutie
+schema_version=3.1
+usb_devices=9
+serial_devices=9
+software_stacks=7
+sensors=1
+actuators=0
+ros_devices=0
+ros_runtime_items=20
+findings=7
+inspection_mode=passive
+state_changed=false

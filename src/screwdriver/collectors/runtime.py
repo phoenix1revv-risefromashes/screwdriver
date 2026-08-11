@@ -970,7 +970,8 @@ def _ros_device_inventory(
                         "message_types": ", ".join(message_types) or None,
                         "hardware_parameters": _format_parameters(parameters),
                         "configured_device": _configured_device(parameters),
-                        "state": "IN_USE_BY_ROS",
+                        "state": "ROS_ROLE_ACTIVE",
+                        "ownership": "ROLE_ONLY",
                         "health": "GRAPH_CONNECTION_VERIFIED_HARDWARE_NOT_EXERCISED",
                         "confidence": confidence,
                         "evidence": evidence,
@@ -1050,8 +1051,14 @@ def _ros_device_roles(
                     "VERIFIED",
                     f"publishes {message_type} on {topic}",
                 )
-            elif sensor_kind == "microphone" and message_type in _AUDIO_MESSAGE_TYPES:
-                pass
+            elif sensor_kind == "microphone":
+                # Topic words such as "audio/status" do not prove microphone
+                # ownership. Accept microphone data only from a mic-like node
+                # with an audio payload type.
+                if message_type not in _AUDIO_MESSAGE_TYPES or not _node_identity_supports(
+                    node, parameters, "microphone"
+                ):
+                    continue
             else:
                 add(
                     "sensor / input",
@@ -1060,7 +1067,9 @@ def _ros_device_roles(
                     "VERIFIED",
                     f"publishes {message_type} on {topic}",
                 )
-        if message_type in _AUDIO_MESSAGE_TYPES:
+        if message_type in _AUDIO_MESSAGE_TYPES and _node_identity_supports(
+            node, parameters, "microphone"
+        ):
             add(
                 "audio",
                 "microphone / audio capture",
@@ -1071,7 +1080,9 @@ def _ros_device_roles(
 
     for topic in subscribed_topics:
         message_type = topic_types.get(topic, "unknown")
-        if message_type in _AUDIO_MESSAGE_TYPES:
+        if message_type in _AUDIO_MESSAGE_TYPES and _node_identity_supports(
+            node, parameters, "speaker"
+        ):
             add(
                 "audio",
                 "speaker / audio output",
@@ -1089,33 +1100,31 @@ def _ros_device_roles(
             )
 
     identity = " ".join((node, *parameters.keys(), *parameters.values())).lower()
-    input_side = " ".join((identity, *published_topics)).lower()
-    output_side = " ".join((identity, *subscribed_topics)).lower()
-    bidirectional = f"{input_side} {output_side}"
+    bidirectional = " ".join((identity, *published_topics, *subscribed_topics)).lower()
 
     for haystack, tokens, role in (
         (
-            output_side,
+            identity,
             ("speaker", "playback", "audio_output", "sound_player"),
             ("audio", "speaker / audio output", "output"),
         ),
         (
-            input_side,
+            identity,
             ("microphone", "mic_recorder", "audio_capture", "mic_node"),
             ("audio", "microphone / audio capture", "input"),
         ),
         (
-            output_side,
+            identity,
             ("display", "screen", "hmi", "lcd", "oled", "face_gui", "face_display", "face"),
             ("display / HMI", "display / visual output", "output"),
         ),
         (
-            output_side,
+            identity,
             ("motor", "servo", "gripper", "diff_drive", "drive_controller"),
             ("actuator / output", "motor / actuator controller", "output / control"),
         ),
         (
-            input_side,
+            identity,
             ("battery", "bms", "power_supply"),
             ("power", "power / battery device", "input / monitoring"),
         ),
@@ -1138,6 +1147,15 @@ def _ros_device_roles(
             ("communication", "hardware communication interface", "bidirectional"),
         ),
     ):
+        role_kind = role[1]
+        if role_kind == "speaker / audio output" and not _node_identity_supports(
+            node, parameters, "speaker"
+        ):
+            continue
+        if role_kind == "microphone / audio capture" and not _node_identity_supports(
+            node, parameters, "microphone"
+        ):
+            continue
         if any(token in haystack for token in tokens):
             add(*role, "CORRELATED", "ROS node/parameter or endpoint direction")
 
@@ -1191,7 +1209,21 @@ def _topics_for_device_role(
         )
         if matches and topic not in selected:
             selected.append(topic)
-    return selected or list(dict.fromkeys(candidates))
+    return selected
+
+
+def _node_identity_supports(node: str, parameters: dict[str, str], role: str) -> bool:
+    node_identity = node.lower()
+    parameter_identity = " ".join((*parameters.keys(), *parameters.values())).lower()
+    if role == "speaker":
+        node_tokens = ("speaker", "playback", "audio_output", "sound_player")
+        parameter_tokens = ("playback_device", "speaker_device", "audio_output", "alsa_sink")
+    else:
+        node_tokens = ("microphone", "mic_recorder", "audio_capture", "mic_node")
+        parameter_tokens = ("capture_device", "microphone_device", "audio_input", "alsa_source")
+    return any(token in node_identity for token in node_tokens) or any(
+        token in parameter_identity for token in parameter_tokens
+    )
 
 
 def _legacy_inventory_as_ros_device(
@@ -1237,6 +1269,9 @@ def _inherit_device_correlations(
             ):
                 if item.details.get(key) is not None:
                     device.details[key] = item.details[key]
+            if device.details.get("physical_component"):
+                device.details["state"] = "IN_USE_BY_ROS"
+                device.details["ownership"] = "PHYSICAL_MAPPING_CORRELATED"
 
 
 def _correlate_ros_devices_with_physical(
@@ -1269,6 +1304,8 @@ def _correlate_ros_devices_with_physical(
                     "physical_channel": serial_device.port,
                     "driver": serial_device.driver,
                     "confidence": "CONFIGURED_PATH_MATCH",
+                    "state": "IN_USE_BY_ROS",
+                    "ownership": "PHYSICAL_PATH_VERIFIED",
                     "correlation_evidence": f"ROS configuration references {matched}",
                 }
             )
@@ -1288,6 +1325,8 @@ def _correlate_ros_devices_with_physical(
                     "physical_channel": matched_node,
                     "driver": ", ".join(usb_device.drivers) or "unbound",
                     "confidence": "CONFIGURED_PATH_MATCH",
+                    "state": "IN_USE_BY_ROS",
+                    "ownership": "PHYSICAL_PATH_VERIFIED",
                     "correlation_evidence": f"ROS configuration references {matched_node}",
                 }
             )

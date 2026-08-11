@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
+from screwdriver.agent_providers import DEFAULT_MODELS, EFFORT_CHOICES, PROVIDER_CHOICES
 from screwdriver.agentic import analyze_snapshot_file
 from screwdriver.collectors import collect_host
 from screwdriver.models import (
@@ -19,7 +20,12 @@ from screwdriver.models import (
     USBDevice,
 )
 from screwdriver.report_time import REPORT_TIMEZONE_NAME, format_report_time
-from screwdriver.storage import ReportPaths, build_report_paths, save_reports
+from screwdriver.storage import (
+    ReportPaths,
+    build_report_paths,
+    create_report_run,
+    save_reports,
+)
 
 _WIDTH = 72
 
@@ -53,21 +59,21 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_parser.add_argument(
         "--output",
         type=Path,
-        default=Path("reports"),
-        help="Report directory (default: reports).",
+        default=Path("report"),
+        help="Report root containing local/ and agentic/ runs (default: report).",
     )
     _add_agent_options(inspect_parser)
 
     analyze_parser = subparsers.add_parser(
         "analyze",
-        help="Analyze an existing snapshot and generate two agentic reports.",
+        help="Analyze an existing snapshot and generate organized agentic reports.",
     )
     analyze_parser.add_argument("snapshot", type=Path, help="Path to snapshot.json.")
     analyze_parser.add_argument(
         "--output",
         type=Path,
-        default=Path("reports/analysis"),
-        help="Analysis report directory (default: reports/analysis).",
+        default=Path("report"),
+        help="Report root containing agentic/<timestamp>/ (default: report).",
     )
     analyze_parser.add_argument(
         "--focus",
@@ -82,20 +88,26 @@ def _add_agent_options(parser: argparse.ArgumentParser) -> None:
 
     parser.add_argument(
         "--provider",
-        choices=("anthropic", "none"),
+        choices=PROVIDER_CHOICES,
         default="anthropic",
-        help="AI provider: Anthropic Claude or deterministic analysis only.",
+        help="Analysis provider: anthropic, openai, or none (default: anthropic).",
     )
     parser.add_argument(
         "--model",
-        default="claude-sonnet-5",
-        help="Anthropic model name (default: claude-sonnet-5).",
+        default=None,
+        help=(
+            "Provider model name. Defaults: anthropic="
+            f"{DEFAULT_MODELS['anthropic']}, openai={DEFAULT_MODELS['openai']}."
+        ),
     )
     parser.add_argument(
         "--effort",
-        choices=("low", "medium", "high", "xhigh"),
+        choices=EFFORT_CHOICES,
         default="medium",
-        help="Claude reasoning effort (default: medium).",
+        help=(
+            "Reasoning effort: light, medium, or high (default: medium). "
+            "Unsupported models use their native default."
+        ),
     )
     parser.add_argument(
         "--investigate",
@@ -135,7 +147,8 @@ def _run_inspect(args: argparse.Namespace) -> int:
     snapshot = collect_host()
     duration = time.monotonic() - started_monotonic
     mode = "agentic" if args.agentic else "local"
-    paths = build_report_paths(args.output)
+    run = create_report_run(args.output, created_at=snapshot.created_at)
+    paths = build_report_paths(run.local_directory)
     report = format_snapshot(
         snapshot,
         mode=mode,
@@ -144,20 +157,29 @@ def _run_inspect(args: argparse.Namespace) -> int:
         paths=paths,
         focus=args.focus,
     )
-    report_paths = save_reports(snapshot, report, args.output)
+    report_paths = save_reports(
+        snapshot,
+        report,
+        run.local_directory,
+        scan_id=run.scan_id,
+        duration_seconds=duration,
+    )
     print(report)
     if args.agentic:
         outcome = analyze_snapshot_file(
             report_paths.snapshot,
-            args.output,
+            run.agentic_directory,
             provider=args.provider,
             model=args.model,
             effort=args.effort,
             investigate=args.investigate,
             focus=args.focus,
+            scan_id=run.scan_id,
+            collection_duration_seconds=duration,
         )
         print("\n\nAGENTIC REPORTS")
         print("─" * _WIDTH)
+        print(f"Compact snapshot:  {outcome.paths.compact}")
         print(f"System blueprint:  {outcome.paths.blueprint}")
         print(f"Diagnostic report: {outcome.paths.diagnostics}")
         print(f"Structured analysis: {outcome.paths.analysis}")
@@ -170,18 +192,30 @@ def _run_inspect(args: argparse.Namespace) -> int:
 def _run_analyze(args: argparse.Namespace) -> int:
     """Analyze an existing snapshot without collecting or changing system state."""
 
+    source_scan_id = (
+        args.snapshot.parent.name
+        if args.snapshot.name == "snapshot.json" and args.snapshot.parent.parent.name == "local"
+        else None
+    )
+    run = create_report_run(
+        args.output,
+        requested_scan_id=source_scan_id,
+        allow_existing_local=source_scan_id is not None,
+    )
     outcome = analyze_snapshot_file(
         args.snapshot,
-        args.output,
+        run.agentic_directory,
         provider=args.provider,
         model=args.model,
         effort=args.effort,
         investigate=args.investigate,
         focus=args.focus,
+        scan_id=run.scan_id,
     )
     print("SCREWDRIVER AGENTIC ANALYSIS")
     print("─" * _WIDTH)
     print(f"Source snapshot:   {args.snapshot}")
+    print(f"Compact snapshot:  {outcome.paths.compact}")
     print(f"System blueprint:  {outcome.paths.blueprint}")
     print(f"Diagnostic report: {outcome.paths.diagnostics}")
     print(f"Structured analysis: {outcome.paths.analysis}")

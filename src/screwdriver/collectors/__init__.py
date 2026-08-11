@@ -64,6 +64,8 @@ def collect_host() -> SystemSnapshot:
         snapshot.ros_runtime_inventory = runtime.ros_runtime
         snapshot.findings.extend(runtime.findings)
 
+    _reclassify_conditional_findings(snapshot)
+
     if any(
         finding.severity in {FindingSeverity.WARNING, FindingSeverity.ERROR}
         for finding in snapshot.findings
@@ -110,6 +112,48 @@ def _remove_known_false_positives(snapshot: SystemSnapshot) -> None:
         filtered.append(finding)
 
     snapshot.findings = filtered
+
+
+def _reclassify_conditional_findings(snapshot: SystemSnapshot) -> None:
+    """Keep conditional observations, but do not present them as proven faults."""
+
+    ros_device_text = " ".join(
+        str(value)
+        for component in snapshot.ros_device_inventory
+        for value in component.details.values()
+        if value is not None
+    )
+    runtime = next(
+        (
+            component.details
+            for component in snapshot.ros_runtime_inventory
+            if component.category == "ROS runtime"
+        ),
+        {},
+    )
+    for finding in snapshot.findings:
+        if finding.code.startswith("SERIAL_"):
+            related = any(
+                identity and identity in ros_device_text
+                for device in snapshot.serial_devices
+                if device.port in finding.summary
+                for identity in (device.port, device.stable_id_path)
+            )
+            if not related:
+                finding.severity = FindingSeverity.INFO
+                finding.recommendation = (
+                    "Confirm that this serial interface is required before changing permissions "
+                    "or identity rules."
+                )
+        if (
+            finding.code == "ROS_ENVIRONMENT_NOT_SOURCED"
+            and runtime.get("state") == "RUNNING"
+            and runtime.get("environment_recovered")
+        ):
+            finding.severity = FindingSeverity.INFO
+            finding.recommendation = (
+                "Source the recovered ROS environment only when running interactive ROS commands."
+            )
 
 
 __all__ = [

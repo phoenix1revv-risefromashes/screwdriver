@@ -1,0 +1,571 @@
+╭──────────────────────────────────────────────────────────────────────╮
+│ SCREWDRIVER                                                          │
+│ Universal inspection of Linux-based robotic computers                │
+│ Passive inspection — no hardware was activated or modified           │
+╰──────────────────────────────────────────────────────────────────────╯
+
+Inspection mode: agentic
+Probe safety:    PASSIVE
+Report timezone: America/Los_Angeles
+Started:         2026-08-11 06:46:41 PDT
+Agentic status:  collection followed by blueprint and diagnostic analysis
+Repair policy:   recommendations only; no fixes are executed
+
+
+HOST IDENTITY
+────────────────────────────────────────────────────────────────────────
+Hostname:           cutie
+Username:           phoenix
+Effective user:     phoenix
+UID / GID:          1000 / 1000
+Groups:             adm, audio, cdrom, dip, gdm, gpio, i2c, lpadmin, ollama, phoenix, plugdev, render, sambashare, sudo, video, weston-launch
+Login shell:        /bin/bash
+Machine ID:         1512b127…35d6
+
+
+OPERATING SYSTEM
+────────────────────────────────────────────────────────────────────────
+Distribution:       Ubuntu 22.04.5 LTS
+Kernel:             5.15.199-tegra
+Kernel build:       #1 SMP PREEMPT Thu Jul 16 11:27:38 PDT 2026
+Architecture:       aarch64
+Boot mode:          UEFI
+Init system:        systemd
+Package manager:    apt
+System timezone:    PDT
+Boot time:          2026-08-10 18:30:18 PDT
+Uptime:             12 hours, 16 minutes
+Running processes:  345
+
+
+PLATFORM
+────────────────────────────────────────────────────────────────────────
+Manufacturer:       NVIDIA
+Product:            NVIDIA Jetson Orin Nano Engineering Reference Developer Kit Super
+Board:              Jetson
+Board revision:     Not Specified
+Firmware:           36.5.2-gcid-46426093
+Machine type:       physical computer
+Virtualization:     none detected
+Platform family:    nvidia-jetson
+Enrichment module:  jetson
+Serial number:     available in snapshot.json
+
+
+PLATFORM-SPECIFIC DETAILS — NVIDIA-JETSON
+────────────────────────────────────────────────────────────────────────
+L4T:                36.5.2
+Power Mode:         NV Power Mode: MAXN_SUPER | 2
+
+
+CPU
+────────────────────────────────────────────────────────────────────────
+Model:              ARMv8 Processor rev 1 (v8l)
+Vendor:             0x41
+Sockets:            unavailable
+Physical cores:     6
+Logical CPUs:       6
+Online CPUs:        6
+Current frequency:  1.19 GHz
+Minimum frequency:  730 MHz
+Maximum frequency:  1.73 GHz
+CPU usage:          0.0%
+Load average:       0.17, 0.21, 0.14
+Governor:           schedutil
+Cache L1 data:      384 KiB (6 instances)
+Cache L1 instruction: 384 KiB (6 instances)
+Cache L2:           1.5 MiB (6 instances)
+Cache L3:           4 MiB (2 instances)
+
+
+MEMORY
+────────────────────────────────────────────────────────────────────────
+Physical memory:
+  Total:            7.43 GiB
+  Used:             4.32 GiB
+  Available:        3.11 GiB
+  Usage:            58.2%
+  Shared:           12.00 MiB
+
+Swap:
+  Total:            3.71 GiB
+  Used:             1.62 GiB
+  Available:        2.09 GiB
+  Usage:            43.7%
+
+
+STORAGE DEVICES
+────────────────────────────────────────────────────────────────────────
+Device:             /dev/sda
+  Model:            microcontroller
+  Connection:       usb
+  Media type:       USB HDD
+  Capacity:         1.54 MiB
+  Firmware:         1.0
+  Removable:        yes
+  Read-only:        no
+  Serial:           available in snapshot.json
+
+Device:             /dev/zram0
+  Model:            unavailable
+  Connection:       unavailable
+  Media type:       SSD/flash
+  Capacity:         633.95 MiB
+  Firmware:         unavailable
+  Removable:        no
+  Read-only:        no
+  Serial:           not reported
+
+Device:             /dev/zram1
+  Model:            unavailable
+  Connection:       unavailable
+  Media type:       SSD/flash
+  Capacity:         633.95 MiB
+  Firmware:         unavailable
+  Removable:        no
+  Read-only:        no
+  Serial:           not reported
+
+Device:             /dev/zram2
+  Model:            unavailable
+  Connection:       unavailable
+  Media type:       SSD/flash
+  Capacity:         633.95 MiB
+  Firmware:         unavailable
+  Removable:        no
+  Read-only:        no
+  Serial:           not reported
+
+Device:             /dev/zram3
+  Model:            unavailable
+  Connection:       unavailable
+  Media type:       SSD/flash
+  Capacity:         633.95 MiB
+  Firmware:         unavailable
+  Removable:        no
+  Read-only:        no
+  Serial:           not reported
+
+Device:             /dev/zram4
+  Model:            unavailable
+  Connection:       unavailable
+  Media type:       SSD/flash
+  Capacity:         633.95 MiB
+  Firmware:         unavailable
+  Removable:        no
+  Read-only:        no
+  Serial:           not reported
+
+Device:             /dev/zram5
+  Model:            unavailable
+  Connection:       unavailable
+  Media type:       SSD/flash
+  Capacity:         633.95 MiB
+  Firmware:         unavailable
+  Removable:        no
+  Read-only:        no
+  Serial:           not reported
+
+Device:             /dev/nvme0n1
+  Model:            WD Green SN3000 500GB
+  Connection:       nvme
+  Media type:       NVMe SSD
+  Capacity:         465.76 GiB
+  Firmware:         unavailable
+  Removable:        no
+  Read-only:        no
+  Serial:           available in snapshot.json
+  Filesystems:
+    /dev/nvme0n1p1
+      Filesystem:   ext4
+      Mount point:  /
+      Capacity:     455.95 GiB
+      Used:         31.69 GiB
+      Available:    401.02 GiB
+      Usage:        7.3%
+    /dev/nvme0n1p10
+      Filesystem:   vfat
+      Mount point:  /boot/efi
+      Capacity:     63.00 MiB
+      Used:         78.00 KiB
+      Available:    62.92 MiB
+      Usage:        0.1%
+
+
+
+GRAPHICS AND COMPUTE ACCELERATORS
+────────────────────────────────────────────────────────────────────────
+GPU 0:
+  Vendor:           NVIDIA
+  Model:            Orin (nvgpu)
+  Driver:           540.5.0
+  Bus ID:           [N/A]
+  Memory:           unavailable
+  Usage:            unavailable
+  Temperature:      unavailable
+
+
+
+THERMAL AND COOLING
+────────────────────────────────────────────────────────────────────────
+cpu-thermal: sensor 0: 50.6°C  healthy
+gpu-thermal: sensor 0: 51.0°C  healthy
+soc0-thermal: sensor 0: 50.2°C  healthy
+soc1-thermal: sensor 0: 50.7°C  healthy
+soc2-thermal: sensor 0: 48.8°C  healthy
+tj-thermal: sensor 0: 50.8°C  healthy
+
+
+POWER
+────────────────────────────────────────────────────────────────────────
+Power source:       external or unknown
+Battery detected:   no
+
+
+NETWORK
+────────────────────────────────────────────────────────────────────────
+Default route:      enP8p1s0
+Gateway:            192.168.4.1
+DNS servers:        127.0.0.53
+Internet route:     available
+
+Interface:          wlP1p1s0
+  Type:             wifi
+  State:            down
+  IPv4:             none
+  MAC:              50:2e:91:f3:32:13
+  Link speed:       unavailable
+  Duplex:           unavailable
+  Driver:           rtl88x2ce
+  Default route:    no
+
+Interface:          can0
+  Type:             ethernet
+  State:            down
+  IPv4:             none
+  MAC:              unavailable
+  Link speed:       unavailable
+  Duplex:           unavailable
+  Driver:           mttcan
+  Default route:    no
+
+Interface:          enP8p1s0
+  Type:             ethernet
+  State:            up
+  IPv4:             192.168.4.68/22
+  MAC:              ac:3a:e2:7c:15:d4
+  Link speed:       1,000 Mb/s
+  Duplex:           full
+  Driver:           r8168
+  Default route:    yes
+
+Interface:          usb0
+  Type:             USB-gadget network
+  State:            up
+  IPv4:             none
+  MAC:              aa:a1:87:c2:01:d1
+  Link speed:       unavailable
+  Duplex:           unavailable
+  Driver:           unavailable
+  Default route:    no
+
+Interface:          usb1
+  Type:             USB-gadget network
+  State:            up
+  IPv4:             none
+  MAC:              aa:a1:87:c2:01:d3
+  Link speed:       unavailable
+  Duplex:           unavailable
+  Driver:           unavailable
+  Default route:    no
+
+IPv6:              excluded by output preference
+Virtual interfaces: 3 detected, hidden from summary
+  Includes:        lo, l4tbr0, docker0
+  Full inventory:  available in snapshot.json
+
+
+USB HARDWARE INVENTORY
+────────────────────────────────────────────────────────────────────────
+USB device 1: Linux 5.15.199-tegra xhci-hcd xHCI Host Controller
+  USB ID:           1d6b:0002
+  Location:         bus 001, device 001
+  USB version:      2.00
+  Link speed:       480 Mb/s
+  Device class:     09 (hub)
+  Kernel drivers:   usb
+  Serial:           available in snapshot.json
+  Access:           read-only
+
+USB device 2: Generic 4-Port USB 2.0 Hub
+  USB ID:           0bda:5489
+  Location:         bus 001, device 002
+  USB version:      2.10
+  Link speed:       480 Mb/s
+  Device class:     09 (hub)
+  Kernel drivers:   hub, usb
+  Access:           read-only
+
+USB device 3: Realtek Bluetooth Radio
+  USB ID:           13d3:3549
+  Location:         bus 001, device 003
+  USB version:      1.00
+  Link speed:       12 Mb/s
+  Device class:     e0 (wireless controller)
+  Kernel drivers:   rtk_btusb, usb
+  Serial:           available in snapshot.json
+  Access:           read-only
+
+USB device 4: STMicroelectronics STM32 STLink
+  USB ID:           0483:374b
+  Location:         bus 001, device 004
+  USB version:      2.00
+  Link speed:       12 Mb/s
+  Device class:     ef (miscellaneous)
+  Kernel drivers:   cdc_acm, usb, usb-storage
+  Serial:           available in snapshot.json
+  Access:           mixed (denied, read-write)
+
+USB device 5: Silicon Labs CP2102N USB to UART Bridge Controller
+  USB ID:           10c4:ea60
+  Location:         bus 001, device 006
+  USB version:      2.00
+  Link speed:       12 Mb/s
+  Device class:     00 (defined at interface level)
+  Kernel drivers:   cp210x, usb
+  Serial:           available in snapshot.json
+  Access:           mixed (denied, read-only, read-write)
+
+USB device 6: Seeed Studio reSpeaker XVF3800 4-Mic Array
+  USB ID:           2886:001a
+  Location:         bus 001, device 007
+  USB version:      2.01
+  Link speed:       480 Mb/s
+  Device class:     ef (miscellaneous)
+  Kernel drivers:   snd-usb-audio, usb, usbhid
+  Serial:           available in snapshot.json
+  Access:           mixed (denied, read-only, read-write)
+
+USB device 7: QDtech MPI5001
+  USB ID:           0484:5750
+  Location:         bus 001, device 008
+  USB version:      0.01
+  Link speed:       12 Mb/s
+  Device class:     00 (defined at interface level)
+  Kernel drivers:   usb, usbhid
+  Serial:           available in snapshot.json
+  Access:           mixed (denied, read-only)
+
+USB device 8: Linux 5.15.199-tegra xhci-hcd xHCI Host Controller
+  USB ID:           1d6b:0003
+  Location:         bus 002, device 001
+  USB version:      3.10
+  Link speed:       10000 Mb/s
+  Device class:     09 (hub)
+  Kernel drivers:   usb
+  Serial:           available in snapshot.json
+  Access:           read-only
+
+USB device 9: Generic 4-Port USB 3.0 Hub
+  USB ID:           0bda:0489
+  Location:         bus 002, device 002
+  USB version:      3.20
+  Link speed:       10000 Mb/s
+  Device class:     09 (hub)
+  Kernel drivers:   hub, usb
+  Access:           read-only
+
+
+
+SERIAL / TTY DIAGNOSTICS
+────────────────────────────────────────────────────────────────────────
+Passive metadata only — serial ports were not opened and DTR/RTS were not toggled.
+
+Serial device 1: STMicroelectronics STM32 STLink
+  Port:             /dev/ttyACM0
+  Transport:        usb-cdc-acm
+  Kernel driver:    cdc_acm
+  USB ID:           0483:374b
+  Stable by-id:     /dev/serial/by-id/usb-STMicroelectronics_STM32_STLink_0665FF575171525067053428-if02
+  Physical path:    /dev/serial/by-path/platform-3610000.usb-usb-0:2.1:1.2
+  Access:           read-write
+
+Serial device 2: ttyAMA0
+  Port:             /dev/ttyAMA0
+  Transport:        onboard-uart
+  Kernel driver:    sbsa-uart
+  USB ID:           unavailable
+  Stable by-id:     not available
+  Physical path:    not available
+  Access:           denied
+
+Serial device 3: ttyS0
+  Port:             /dev/ttyS0
+  Transport:        onboard-uart
+  Kernel driver:    serial8250
+  USB ID:           unavailable
+  Stable by-id:     not available
+  Physical path:    not available
+  Access:           denied
+
+Serial device 4: ttyS1
+  Port:             /dev/ttyS1
+  Transport:        onboard-uart
+  Kernel driver:    serial8250
+  USB ID:           unavailable
+  Stable by-id:     not available
+  Physical path:    not available
+  Access:           denied
+
+Serial device 5: ttyS2
+  Port:             /dev/ttyS2
+  Transport:        onboard-uart
+  Kernel driver:    serial8250
+  USB ID:           unavailable
+  Stable by-id:     not available
+  Physical path:    not available
+  Access:           denied
+
+Serial device 6: ttyS3
+  Port:             /dev/ttyS3
+  Transport:        onboard-uart
+  Kernel driver:    serial8250
+  USB ID:           unavailable
+  Stable by-id:     not available
+  Physical path:    not available
+  Access:           denied
+
+Serial device 7: ttyTHS1
+  Port:             /dev/ttyTHS1
+  Transport:        onboard-uart
+  Kernel driver:    serial-tegra
+  USB ID:           unavailable
+  Stable by-id:     not available
+  Physical path:    not available
+  Access:           denied
+
+Serial device 8: ttyTHS2
+  Port:             /dev/ttyTHS2
+  Transport:        onboard-uart
+  Kernel driver:    serial-tegra
+  USB ID:           unavailable
+  Stable by-id:     not available
+  Physical path:    not available
+  Access:           denied
+
+Serial device 9: Silicon Labs CP2102N USB to UART Bridge Controller
+  Port:             /dev/ttyUSB0
+  Transport:        usb-serial
+  Kernel driver:    cp210x
+  USB ID:           10c4:ea60
+  Stable by-id:     /dev/serial/by-id/usb-Silicon_Labs_CP2102N_USB_to_UART_Bridge_Controller_720a07b73a70f0118fdd8a301045c30f-if00-port0
+  Physical path:    /dev/serial/by-path/platform-3610000.usb-usb-0:2.4:1.0-port0
+  Access:           denied
+
+
+
+SOFTWARE STACK INVENTORY
+────────────────────────────────────────────────────────────────────────
+Passive metadata only — no sensor stream was read and no actuator was commanded.
+
+1. ROS installation and environment
+  Category:         software stack
+  Status:           WARNING
+  State:            INSTALLED
+
+2. Robot State Publisher
+  Category:         software stack
+  Status:           OK
+  State:            INSTALLED
+
+3. colcon
+  Category:         software stack
+  Status:           OK
+  State:            INSTALLED
+
+4. rosdep
+  Category:         software stack
+  Status:           OK
+  State:            INSTALLED
+
+5. vcstool
+  Category:         software stack
+  Status:           OK
+  State:            INSTALLED
+
+6. Docker
+  Category:         software stack
+  Status:           OK
+  State:            RUNNING
+
+7. CUDA Toolkit
+  Category:         software stack
+  Status:           OK
+  State:            INSTALLED
+
+
+
+PHYSICAL SENSOR INVENTORY
+────────────────────────────────────────────────────────────────────────
+Passive metadata only — no sensor stream was read and no actuator was commanded.
+
+1. Seeed Studio reSpeaker XVF3800 4-Mic Array
+  Category:         sensor
+  Status:           OK
+  State:            DETECTED
+  Kind:             microphone
+  Source:           Linux USB/sysfs
+  Bus:              USB
+  Device / channel: /dev/bus/usb/001/007, /dev/char/116:50, /dev/char/116:51, /dev/char/116:52, /dev/char/13:70, /dev/char/13:71, /dev/char/13:72, /dev/char/189:6, /dev/char/510:1, /dev/hidraw1, /dev/input/by-id/usb-Seeed_Studio_reSpeaker_XVF3800_4-Mic_Array_101991441261600088-event-if05, /dev/input/by-path/platform-3610000.usb-usb-0:1:1.5-event, /dev/input/event6, /dev/input/event7, /dev/input/event8, /dev/snd/by-id/usb-Seeed_Studio_reSpeaker_XVF3800_4-Mic_Array_101991441261600088-00, /dev/snd/by-path/platform-3610000.usb-usb-0:1:1.0, /dev/snd/controlC2, /dev/snd/pcmC2D0c, /dev/snd/pcmC2D0p
+  Driver:           snd-usb-audio, usb, usbhid
+  Health:           PRESENT_NOT_EXERCISED
+  Confidence:       VERIFIED
+
+
+
+ROS 2 OVERVIEW
+────────────────────────────────────────────────────────────────────────
+Graph state:        UNAVAILABLE
+ROS distribution:   unavailable
+Domain ID:          0
+DDS middleware:     default
+Discovery mode:     unavailable
+Environment recovered: no
+Nodes:              0
+Topics:             0
+Services:           0
+Actions:            0
+Probe:              metadata only; no publications or hardware commands
+
+
+DIAGNOSTIC SUMMARY
+────────────────────────────────────────────────────────────────────────
+Overall status:     HEALTHY WITH WARNINGS
+Warnings:           1
+Errors:             0
+Informational:      5
+
+[INFO] Current user lacks read-write access to /dev/ttyUSB0.
+       Evidence: permissions=crw-rw----, owner=root:dialout, access=denied
+       Recommendation: Confirm that this serial interface is required before changing permissions or identity rules.
+[WARNING] ROS is installed, but the current shell is not sourced.
+       Evidence: Installed distributions: humble
+       Recommendation: Run: source /opt/ros/<distribution>/setup.bash
+[INFO] [OK] Detected robotics stacks: Robot State Publisher.
+[INFO] [OK] Available robotics tools: colcon, rosdep, vcstool, Docker.
+[INFO] [OK] Available compute stack: CUDA Toolkit.
+[INFO] Live ROS 2 inspection was skipped because ros2 is unavailable in this shell.
+       Recommendation: Source the ROS 2 environment before inspection when live graph inventory is required.
+
+
+REPORTS
+────────────────────────────────────────────────────────────────────────
+Snapshot:           report/local/2026-08-11_06-46-42/snapshot.json
+Terminal report:    report/local/2026-08-11_06-46-42/report.txt
+HTML report:        report/local/2026-08-11_06-46-42/report.html
+Diagnostic log:     report/local/2026-08-11_06-46-42/inspection.log
+
+Duration:           0.47 seconds
+Completed:          2026-08-11 06:46:42 PDT
+
+No configuration, device state, or hardware output was changed.

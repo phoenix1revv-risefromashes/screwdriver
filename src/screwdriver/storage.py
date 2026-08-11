@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import hashlib
 import html
 import json
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 from screwdriver.models import Component, SystemSnapshot
-from screwdriver.report_time import report_isoformat
+from screwdriver.report_time import report_isoformat, to_report_timezone
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,10 +23,50 @@ class ReportPaths:
     diagnostic_log: Path
 
 
+@dataclass(frozen=True, slots=True)
+class ReportRun:
+    """Directory contract shared by local and agentic output from one scan."""
+
+    scan_id: str
+    root: Path
+    local_directory: Path
+    agentic_directory: Path
+
+
+def create_report_run(
+    report_root: Path,
+    *,
+    created_at: datetime | None = None,
+    requested_scan_id: str | None = None,
+    allow_existing_local: bool = False,
+) -> ReportRun:
+    """Reserve a non-overwriting timestamp directory for one report run."""
+
+    instant = created_at or datetime.now(UTC)
+    base_id = requested_scan_id or to_report_timezone(instant).strftime("%Y-%m-%d_%H-%M-%S")
+    scan_id = base_id
+    suffix = 1
+    while (
+        (report_root / "local" / scan_id).exists() and not allow_existing_local
+    ) or (report_root / "agentic" / scan_id).exists():
+        scan_id = f"{base_id}_{suffix:02d}"
+        suffix += 1
+
+    return ReportRun(
+        scan_id=scan_id,
+        root=report_root,
+        local_directory=report_root / "local" / scan_id,
+        agentic_directory=report_root / "agentic" / scan_id,
+    )
+
+
 def save_reports(
     snapshot: SystemSnapshot,
     terminal_report: str,
     output_directory: Path,
+    *,
+    scan_id: str | None = None,
+    duration_seconds: float | None = None,
 ) -> ReportPaths:
     """Persist all reports without changing any inspected system state."""
 
@@ -65,6 +107,32 @@ def save_reports(
                 "",
             ]
         ),
+        encoding="utf-8",
+    )
+
+    snapshot_fingerprint = hashlib.sha256(paths.snapshot.read_bytes()).hexdigest()
+    (output_directory / "report-manifest.json").write_text(
+        json.dumps(
+            {
+                "report_kind": "local",
+                "scan_id": scan_id or output_directory.name,
+                "created_at": report_isoformat(snapshot.created_at),
+                "schema_version": snapshot.schema_version,
+                "hostname": snapshot.identity.hostname,
+                "collection_duration_seconds": duration_seconds,
+                "snapshot_sha256": snapshot_fingerprint,
+                "artifacts": [
+                    paths.snapshot.name,
+                    paths.text_report.name,
+                    paths.html_report.name,
+                    paths.diagnostic_log.name,
+                ],
+                "inspection_mode": "passive",
+                "state_changed": False,
+            },
+            indent=2,
+        )
+        + "\n",
         encoding="utf-8",
     )
 

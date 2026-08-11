@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import io
 import json
 import os
+import urllib.error
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
 from screwdriver.agentic import (
     ProbeRequest,
+    _deterministic_issues,
+    _merge_agent_issues,
     _probe_command,
     _safe_recommended_commands,
     analyze_snapshot_file,
@@ -106,7 +110,9 @@ def _snapshot() -> dict[str, object]:
     }
 
 
-def test_deterministic_analysis_writes_detailed_two_report_contract(tmp_path: Path) -> None:
+def test_deterministic_analysis_writes_compact_and_detailed_report_contract(
+    tmp_path: Path,
+) -> None:
     snapshot_path = tmp_path / "snapshot.json"
     output = tmp_path / "analysis"
     snapshot_path.write_text(json.dumps(_snapshot()), encoding="utf-8")
@@ -115,20 +121,34 @@ def test_deterministic_analysis_writes_detailed_two_report_contract(tmp_path: Pa
 
     blueprint = result.paths.blueprint.read_text(encoding="utf-8")
     diagnostics = result.paths.diagnostics.read_text(encoding="utf-8")
+    compact = result.paths.compact.read_text(encoding="utf-8")
     analysis = json.loads(result.paths.analysis.read_text(encoding="utf-8"))
 
     assert "Complete Robotic System Blueprint" not in blueprint
     assert "System blueprint — test-robot" in blueprint
-    assert "Devices currently in use by ROS 2" in blueprint
+    assert "Component health and ownership matrix" in blueprint
     assert "Camera" in blueprint
-    assert "Physical device → Linux interface/driver" in blueprint
-    assert "ROS 2 computational graph" in blueprint
-    assert "Unknowns and scan limitations" in blueprint
-    assert "Problems and step-by-step solutions" in diagnostics
+    assert "Active data and command flow" in blueprint
+    assert "Collection coverage" in compact
+    assert "What is working in this snapshot" in compact
+    assert "Degraded behavior" in diagnostics
     assert "Physical memory usage is above 90%." in diagnostics
-    assert "Primary step-by-step approach" in diagnostics
+    assert "Ordered approach" in diagnostics
     assert "Success criteria" in diagnostics
+    for section_id in (
+        "confirmed_failure",
+        "degraded",
+        "configuration_warning",
+        "advisory",
+        "needs_confirmation",
+        "probes",
+    ):
+        assert f'id="{section_id}"' in diagnostics
+    assert 'id="hardware"' in blueprint
+    assert 'id="software"' in blueprint
     assert analysis["repairs_executed"] is False
+    assert analysis["snapshot_sha256"]
+    assert analysis["successful_checks"]
     assert analysis["issues"][0]["code"] == "MEMORY_HIGH_USAGE"
 
 
@@ -154,10 +174,96 @@ def test_agent_recommended_state_changes_are_removed() -> None:
             "sudo chmod 666 /dev/ttyUSB0",
             "systemctl restart robot.service",
             "ros2 topic pub /cmd_vel geometry_msgs/msg/Twist '{}'",
+            "ros_param_list on /camera_node",
+            "recent_kernel_logs for usb",
+            "port_owner probe on /dev/ttyUSB0",
         ]
     )
 
     assert commands == ["ros2 node list"]
+
+
+def test_new_model_issue_requires_a_real_snapshot_evidence_reference() -> None:
+    snapshot = _snapshot()
+    accepted = _merge_agent_issues(
+        snapshot,
+        _deterministic_issues(snapshot),
+        [
+            {
+                "code": "INVENTED_WIFI_FAILURE",
+                "title": "Wi-Fi is broken",
+                "severity": "HIGH",
+                "classification": "CONFIRMED_FAILURE",
+                "confidence": 99,
+                "observation_confidence": 99,
+                "diagnosis_confidence": 99,
+                "expected_state": "Wi-Fi must be up",
+                "operational_impact": "Robot cannot work",
+                "evidence_references": ["network.nonexistent"],
+                "evidence_level": "VERIFIED",
+                "observed": ["Wi-Fi is down"],
+                "probable_causes": ["Unknown"],
+                "primary_approach": ["Inspect it"],
+                "alternative_approaches": [],
+                "diagnostic_commands": [],
+                "success_criteria": ["Wi-Fi is up"],
+            }
+        ],
+    )
+
+    assert all(issue.code != "INVENTED_WIFI_FAILURE" for issue in accepted)
+
+
+def test_conditional_unused_serial_access_is_not_an_actionable_failure(tmp_path: Path) -> None:
+    snapshot = _snapshot()
+    snapshot["serial_devices"] = [
+        {"display_name": "CP2102", "port": "/dev/ttyUSB0", "stable_id_path": None}
+    ]
+    snapshot["findings"].append(
+        {
+            "code": "SERIAL_ACCESS_INCOMPLETE",
+            "severity": "warning",
+            "summary": "Current user lacks read-write access to /dev/ttyUSB0.",
+            "evidence": "access=denied",
+            "recommendation": "Confirm intended use.",
+        }
+    )
+    snapshot_path = tmp_path / "snapshot.json"
+    snapshot_path.write_text(json.dumps(snapshot), encoding="utf-8")
+
+    result = analyze_snapshot_file(snapshot_path, tmp_path / "agentic", provider="none")
+    serial_issue = next(
+        issue for issue in result.issues if issue.code == "SERIAL_ACCESS_INCOMPLETE"
+    )
+
+    assert serial_issue.classification == "NEEDS_CONFIRMATION"
+    assert serial_issue.severity == "INFO"
+    assert "No operational impact is proven" in serial_issue.operational_impact
+
+
+def test_agentic_html_humanizes_bytes_uptime_and_container_values(tmp_path: Path) -> None:
+    snapshot = _snapshot()
+    snapshot["operating_system"]["uptime_seconds"] = 1177.9
+    snapshot["storage_devices"] = [
+        {
+            "model": "WD Green 500GB",
+            "path": "/dev/nvme0n1",
+            "connection": "nvme",
+            "media_type": "NVMe SSD",
+            "capacity_bytes": 500107862016,
+            "partitions": [],
+        }
+    ]
+    snapshot_path = tmp_path / "snapshot.json"
+    snapshot_path.write_text(json.dumps(snapshot), encoding="utf-8")
+
+    result = analyze_snapshot_file(snapshot_path, tmp_path / "agentic", provider="none")
+    blueprint = result.paths.blueprint.read_text(encoding="utf-8")
+
+    assert "19 min 37 sec" in blueprint
+    assert "465.8 GiB" in blueprint
+    assert "<td>500107862016</td>" not in blueprint
+    assert '[&quot;uvcvideo&quot;]' not in blueprint
 
 
 class _FakeAnthropicResponse:
@@ -201,7 +307,7 @@ def test_anthropic_provider_uses_sonnet_five_structured_output_without_leaking_k
 
     with (
         patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-secret-key"}),
-        patch("screwdriver.agentic.urllib.request.urlopen", side_effect=fake_urlopen),
+        patch("screwdriver.agent_providers.urllib.request.urlopen", side_effect=fake_urlopen),
     ):
         result = analyze_snapshot_file(snapshot_path, output, provider="anthropic")
 
@@ -217,9 +323,70 @@ def test_anthropic_provider_uses_sonnet_five_structured_output_without_leaking_k
     assert payload["output_config"]["format"]["type"] == "json_schema"
     assert "temperature" not in payload
     assert result.summary == provider_result["summary"]
-    assert "Anthropic Claude model claude-sonnet-5" in result.provider_status
-    for path in (result.paths.blueprint, result.paths.diagnostics, result.paths.analysis):
+    assert "Anthropic model claude-sonnet-5" in result.provider_status
+    for path in (
+        result.paths.compact,
+        result.paths.blueprint,
+        result.paths.diagnostics,
+        result.paths.analysis,
+    ):
         assert "test-secret-key" not in path.read_text(encoding="utf-8")
+
+
+def test_anthropic_retries_transient_failure_and_records_request_metadata(
+    tmp_path: Path,
+) -> None:
+    snapshot_path = tmp_path / "snapshot.json"
+    snapshot_path.write_text(json.dumps(_snapshot()), encoding="utf-8")
+    provider_result = {
+        "summary": "Anthropic completed after one transient failure.",
+        "architecture_observations": [],
+        "unknowns": [],
+        "issues": [],
+        "probe_requests": [],
+    }
+    attempts = 0
+
+    def fake_urlopen(request: Any, *, timeout: int) -> _FakeAnthropicResponse:
+        nonlocal attempts
+        assert timeout == 120
+        attempts += 1
+        if attempts == 1:
+            error_body = json.dumps(
+                {"error": {"message": "temporarily unavailable"}}
+            ).encode("utf-8")
+            raise urllib.error.HTTPError(
+                request.full_url,
+                503,
+                "Service Unavailable",
+                {},
+                io.BytesIO(error_body),
+            )
+        return _FakeAnthropicResponse(
+            {
+                "id": "msg_test_123",
+                "content": [{"type": "text", "text": json.dumps(provider_result)}],
+                "stop_reason": "end_turn",
+                "usage": {"input_tokens": 321, "output_tokens": 45},
+            }
+        )
+
+    with (
+        patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-secret-key"}, clear=True),
+        patch("screwdriver.agent_providers.urllib.request.urlopen", side_effect=fake_urlopen),
+        patch("screwdriver.agent_providers.time.sleep"),
+    ):
+        result = analyze_snapshot_file(
+            snapshot_path,
+            tmp_path / "analysis",
+            provider="anthropic",
+        )
+
+    analysis = json.loads(result.paths.analysis.read_text(encoding="utf-8"))
+    assert attempts == 2
+    assert analysis["provider_request"]["request_id"] == "msg_test_123"
+    assert analysis["provider_request"]["input_tokens"] == 321
+    assert analysis["provider_request"]["output_tokens"] == 45
 
 
 def test_missing_anthropic_key_generates_deterministic_fallback(tmp_path: Path) -> None:
@@ -233,5 +400,200 @@ def test_missing_anthropic_key_generates_deterministic_fallback(tmp_path: Path) 
     assert result.paths.diagnostics.is_file()
     assert result.paths.analysis.is_file()
     assert result.provider_status == (
-        "Claude unavailable; deterministic fallback (ANTHROPIC_API_KEY is not set)"
+        "Anthropic unavailable; deterministic fallback (ANTHROPIC_API_KEY is not set)"
+    )
+
+
+def test_openai_provider_uses_responses_structured_output_without_leaking_key(
+    tmp_path: Path,
+) -> None:
+    snapshot_path = tmp_path / "snapshot.json"
+    output = tmp_path / "analysis"
+    snapshot_path.write_text(json.dumps(_snapshot()), encoding="utf-8")
+    provider_result = {
+        "summary": "OpenAI organized the verified robot evidence.",
+        "architecture_observations": ["Camera evidence joins Linux and ROS 2."],
+        "unknowns": ["Camera image quality was not actively tested."],
+        "issues": [],
+        "probe_requests": [],
+    }
+    captured: dict[str, Any] = {}
+
+    def fake_urlopen(request: Any, *, timeout: int) -> _FakeAnthropicResponse:
+        captured["request"] = request
+        captured["timeout"] = timeout
+        return _FakeAnthropicResponse(
+            {
+                "status": "completed",
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [{"type": "output_text", "text": json.dumps(provider_result)}],
+                    }
+                ],
+            }
+        )
+
+    with (
+        patch.dict(os.environ, {"OPENAI_API_KEY": "openai-test-secret"}, clear=True),
+        patch("screwdriver.agent_providers.urllib.request.urlopen", side_effect=fake_urlopen),
+    ):
+        result = analyze_snapshot_file(
+            snapshot_path,
+            output,
+            provider="openai",
+            effort="light",
+        )
+
+    request = captured["request"]
+    payload = json.loads(request.data.decode("utf-8"))
+    headers = {key.lower(): value for key, value in request.header_items()}
+    assert request.full_url == "https://api.openai.com/v1/responses"
+    assert captured["timeout"] == 120
+    assert headers["authorization"] == "Bearer openai-test-secret"
+    assert payload["model"] == "gpt-5.6-terra"
+    assert payload["reasoning"]["effort"] == "low"
+    assert payload["text"]["format"]["type"] == "json_schema"
+    assert payload["text"]["format"]["strict"] is True
+    assert payload["store"] is False
+    assert "temperature" not in payload
+    assert result.summary == provider_result["summary"]
+    assert "OpenAI model gpt-5.6-terra (effort light)" in result.provider_status
+    for path in (result.paths.blueprint, result.paths.diagnostics, result.paths.analysis):
+        assert "openai-test-secret" not in path.read_text(encoding="utf-8")
+
+
+def test_missing_openai_key_generates_deterministic_fallback(tmp_path: Path) -> None:
+    snapshot_path = tmp_path / "snapshot.json"
+    snapshot_path.write_text(json.dumps(_snapshot()), encoding="utf-8")
+
+    with patch.dict(os.environ, {}, clear=True):
+        result = analyze_snapshot_file(
+            snapshot_path,
+            tmp_path / "analysis",
+            provider="openai",
+        )
+
+    assert result.provider_status == (
+        "OpenAI unavailable; deterministic fallback (OPENAI_API_KEY is not set)"
+    )
+
+
+def test_openai_retries_without_effort_when_compatible_model_rejects_it(
+    tmp_path: Path,
+) -> None:
+    snapshot_path = tmp_path / "snapshot.json"
+    snapshot_path.write_text(json.dumps(_snapshot()), encoding="utf-8")
+    provider_result = {
+        "summary": "Compatible OpenAI model used its default effort.",
+        "architecture_observations": [],
+        "unknowns": [],
+        "issues": [],
+        "probe_requests": [],
+    }
+    payloads: list[dict[str, Any]] = []
+
+    def fake_urlopen(request: Any, *, timeout: int) -> _FakeAnthropicResponse:
+        assert timeout == 120
+        payloads.append(json.loads(request.data.decode("utf-8")))
+        if len(payloads) == 1:
+            error_body = json.dumps(
+                {
+                    "error": {
+                        "message": (
+                            "Unsupported parameter: 'reasoning' is not supported with this model."
+                        )
+                    }
+                }
+            ).encode("utf-8")
+            raise urllib.error.HTTPError(
+                request.full_url,
+                400,
+                "Bad Request",
+                {},
+                io.BytesIO(error_body),
+            )
+        return _FakeAnthropicResponse(
+            {
+                "status": "completed",
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [{"type": "output_text", "text": json.dumps(provider_result)}],
+                    }
+                ],
+            }
+        )
+
+    with (
+        patch.dict(os.environ, {"OPENAI_API_KEY": "openai-test-secret"}, clear=True),
+        patch("screwdriver.agent_providers.urllib.request.urlopen", side_effect=fake_urlopen),
+    ):
+        result = analyze_snapshot_file(
+            snapshot_path,
+            tmp_path / "analysis",
+            provider="openai",
+            model="gpt-4.1",
+            effort="high",
+        )
+
+    assert payloads[0]["reasoning"] == {"effort": "high"}
+    assert "reasoning" not in payloads[1]
+    assert result.provider_status == (
+        "OpenAI model gpt-4.1 (effort model default; requested high unsupported)"
+    )
+
+
+def test_anthropic_retries_without_effort_when_compatible_model_rejects_it(
+    tmp_path: Path,
+) -> None:
+    snapshot_path = tmp_path / "snapshot.json"
+    snapshot_path.write_text(json.dumps(_snapshot()), encoding="utf-8")
+    provider_result = {
+        "summary": "Compatible Claude model used its default effort.",
+        "architecture_observations": [],
+        "unknowns": [],
+        "issues": [],
+        "probe_requests": [],
+    }
+    payloads: list[dict[str, Any]] = []
+
+    def fake_urlopen(request: Any, *, timeout: int) -> _FakeAnthropicResponse:
+        assert timeout == 120
+        payloads.append(json.loads(request.data.decode("utf-8")))
+        if len(payloads) == 1:
+            error_body = json.dumps(
+                {"error": {"message": "output_config.effort: Extra inputs are not permitted"}}
+            ).encode("utf-8")
+            raise urllib.error.HTTPError(
+                request.full_url,
+                400,
+                "Bad Request",
+                {},
+                io.BytesIO(error_body),
+            )
+        return _FakeAnthropicResponse(
+            {
+                "content": [{"type": "text", "text": json.dumps(provider_result)}],
+                "stop_reason": "end_turn",
+            }
+        )
+
+    with (
+        patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-secret-key"}, clear=True),
+        patch("screwdriver.agent_providers.urllib.request.urlopen", side_effect=fake_urlopen),
+    ):
+        result = analyze_snapshot_file(
+            snapshot_path,
+            tmp_path / "analysis",
+            provider="anthropic",
+            model="claude-haiku-4-5",
+            effort="light",
+        )
+
+    assert payloads[0]["output_config"]["effort"] == "low"
+    assert "effort" not in payloads[1]["output_config"]
+    assert payloads[1]["output_config"]["format"]["type"] == "json_schema"
+    assert result.provider_status == (
+        "Anthropic model claude-haiku-4-5 (effort model default; requested light unsupported)"
     )
