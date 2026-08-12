@@ -358,26 +358,7 @@ After an intentional `pyproject.toml` dependency change:
 Commit `pyproject.toml` and `uv.lock` together. Do not regenerate the lockfile merely to
 hide an unexpected mismatch.
 
-## Troubleshooting
 
-### `.venv/bin/activate: Permission denied`
-
-```bash
-source .venv/bin/activate
-```
-
-Or skip activation and use `.tools/bin/uv run --locked ...`.
-
-### `uv.lock needs to be updated, but --locked was provided`
-
-Confirm whether `pyproject.toml` changed. If it was intentional:
-
-```bash
-.tools/bin/uv lock
-.tools/bin/uv sync --locked --group dev
-```
-
-Otherwise restore the matching `pyproject.toml` and `uv.lock` pair.
 
 ### Provider key is missing
 
