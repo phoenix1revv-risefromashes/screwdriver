@@ -7,6 +7,12 @@ Screwdriver is a read-only Linux inspection and AI-assisted diagnostic tool for 
 
 It inspects hardware, drivers, software, networking, devices, and robotics runtimes, then helps identify bugs, misconfigurations, likely root causes, and recommended fixes.
 
+The robotics software collector distinguishes package presence from configuration,
+runtime, connectivity, and integration. It recognizes ROS middleware, Nav2, AMCL,
+SLAM Toolbox and other mapping stacks, `ros2_control`, MoveIt, perception and speech
+pipelines, micro-ROS bridges, simulation/sandbox environments, teleoperation,
+rosbag, and diagnostics/telemetry components.
+
 > Screwdriver is currently under active development.
 
 ## Core commands
@@ -32,27 +38,36 @@ Collects the same system evidence, then generates:
 * `diagnostic-report.html` — failures, likely causes, and step-by-step solutions
 * `agent-analysis.json` — validated structured evidence behind all three reports
 
-Every run is isolated and never overwrites an older report:
+Every run is isolated and never overwrites an older report. Scan folders use Los
+Angeles local time in the exact form `YYYY-MM-DD_HH:MM:SS`; for example,
+`2026-08-11_06:46:42`. Each report type also maintains an atomically updated
+`latest` symlink.
 
 ```text
-report/
+reports/
 ├── local/<date_timestamp>/
 │   ├── snapshot.json
 │   ├── report.txt
 │   ├── report.html
 │   ├── inspection.log
 │   └── report-manifest.json
-└── agentic/<same_date_timestamp>/
+├── local/latest -> <date_timestamp>
+├── agentic/<same_date_timestamp>/
     ├── compact_snapshot.html
     ├── system-blueprint.html
     ├── diagnostic-report.html
     ├── agent-analysis.json
-    └── report-manifest.json
+│   └── report-manifest.json
+└── agentic/latest -> <same_date_timestamp>
 ```
 
 By default, Screwdriver uses Anthropic Claude Sonnet 5 and falls back to deterministic
 reporting if the API is unavailable. Provider API keys are read only from environment
 variables and are never written to reports.
+
+Agentic commands display provider, model, effort, real processing stages, and an
+elapsed-time heartbeat while waiting for the provider. Interactive terminals use a
+spinner; redirected output uses ordinary lines. No fake completion percentage is shown.
 
 ```bash
 export ANTHROPIC_API_KEY="your-new-key"
@@ -148,6 +163,20 @@ screwdriver analyze snapshot.json \
 * Cameras, audio, serial, and CAN devices
 * Installed software and system services
 * ROS 2 installations, nodes, topics, and configuration
+* Nav2, AMCL, SLAM, control, manipulation, perception, speech, MCU bridges,
+  simulation/sandbox, teleoperation, recording, and monitoring stacks
+* Stack operational stages and hardware-to-ROS-to-capability relationships
+
+## Report relationships
+
+Local text and HTML reports contain deterministic robotics-stack evidence. The three
+agentic reports use the same scan ID and stack terminology, and link between compact
+status, detailed Blueprint architecture, Diagnostic findings, and exact evidence.
+
+Before remote analysis, evidence is bounded, deduplicated, and redacted. Any omitted
+or truncated content is disclosed in the evidence-package metadata. Provider output is
+schema-validated and unsupported findings are rejected unless they resolve to collected
+snapshot evidence.
 
 ## Quick start
 

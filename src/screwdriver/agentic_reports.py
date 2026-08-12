@@ -10,6 +10,9 @@ import re
 from datetime import datetime
 from typing import Any, cast
 
+from screwdriver import __version__
+from screwdriver.report_time import format_report_time
+
 _SEVERITY_ORDER = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "INFO": 4}
 _ACTIONABLE_CLASSES = {"CONFIRMED_FAILURE", "DEGRADED", "CONFIGURATION_WARNING"}
 
@@ -72,6 +75,7 @@ def build_report_context(
         "checks": checks,
         "coverage": coverage,
         "flows": _ros_flows(snapshot),
+        "stacks": _records(snapshot.get("software_stack_inventory")),
         "component_matrix": _component_matrix(snapshot),
         "summary": summary,
         "observations": observations,
@@ -86,6 +90,7 @@ def build_report_context(
         "focus": focus,
         "created_at": _friendly_time(snapshot.get("created_at")),
         "schema_version": snapshot.get("schema_version") or "Not reported",
+        "screwdriver_version": __version__,
     }
 
 
@@ -110,7 +115,7 @@ def render_compact_snapshot(context: dict[str, Any]) -> str:
   <p class="lede">{_h(context['summary'])}</p>
   <div class="meta"><span>Scan {_h(context['scan_id'])}</span><span>{_h(context['created_at'])}</span><span>Passive · no repairs</span></div>
 </header>
-<nav class="toc" aria-label="Report sections"><a href="#attention">Attention</a><a href="#working">Working</a><a href="#flow">Data flow</a><a href="#unknowns">Unknowns</a><a href="#coverage">Coverage</a></nav>
+<nav class="toc" aria-label="Report sections"><a href="#attention">Attention</a><a href="#stacks">Stacks</a><a href="#working">Working</a><a href="#flow">Data flow</a><a href="#unknowns">Unknowns</a><a href="#coverage">Coverage</a></nav>
 {_analysis_notice(context)}
 <section class="priority"><p class="eyebrow">HIGHEST-PRIORITY NEXT CHECK</p><h2>{_h(context['priority'])}</h2></section>
 <section aria-labelledby="at-glance"><h2 id="at-glance">System at a glance</h2>
@@ -124,6 +129,7 @@ def render_compact_snapshot(context: dict[str, Any]) -> str:
   </div>
 </section>
 <section id="attention"><div class="section-head"><h2>Needs attention</h2><a href="diagnostic-report.html">Open detailed diagnostics →</a></div>{attention_html}</section>
+<section id="stacks"><div class="section-head"><h2>Robotics software stacks</h2><a href="system-blueprint.html#software">Open stack architecture →</a></div>{_software_table(context['stacks'], link_to_blueprint=True) if context['stacks'] else _empty_state('No robotics software stack was collected.')}</section>
 <section id="working"><h2>What is working in this snapshot</h2>{_cards(context['checks'], tone="ok")}</section>
 <section id="flow"><div class="section-head"><h2>Verified ROS relationships</h2><a href="system-blueprint.html#data-flow">Open complete flow →</a></div>{_flow_table(context['flows'], limit=10)}</section>
 <section id="unknowns"><h2>Unknowns that must not be mistaken for failures</h2>{_list(context['unknowns'], "No explicit evidence gaps were recorded.")}</section>
@@ -196,7 +202,7 @@ def render_system_blueprint(context: dict[str, Any], snapshot: dict[str, Any]) -
     )
     software = _records(snapshot.get("software_stack_inventory"))
     sections.append(
-        f'<section id="software"><h2>8. Robotics software</h2>{_software_table(software) if software else _empty_state("No robotics software package record was collected.")}</section>'
+        f'<section id="software"><h2>8. Robotics software-stack architecture</h2><p class="muted">Installed does not mean operational. Runtime, connectivity, and integration remain separate evidence states.</p>{_software_table(software, include_anchors=True) if software else _empty_state("No robotics software package record was collected.")}</section>'
     )
     sections.append(
         f"""<section id="interpretation"><h2>9. Agentic interpretation</h2>
@@ -252,9 +258,10 @@ def render_diagnostic_report(context: dict[str, Any], probes: list[dict[str, Any
         f"Diagnostic report — {identity.get('hostname', 'robot')}",
         f"""
 <header class="hero tone-{_h(context['tone'])}"><p class="eyebrow">SCREWDRIVER · EVIDENCE-GROUNDED DIAGNOSTICS</p><h1>{_h(context['overall'])}</h1><p class="lede">Problems are separated from advisories and unknowns. No repair was executed.</p><div class="meta"><span>Scan {_h(context['scan_id'])}</span><span>{_h(context['created_at'])}</span><span>No repairs executed</span></div></header>
-<nav class="toc" aria-label="Report sections"><a href="#overview">Overview</a><a href="#confirmed_failure">Failures</a><a href="#degraded">Degraded</a><a href="#configuration_warning">Warnings</a><a href="#advisory">Advisories</a><a href="#needs_confirmation">Confirm</a><a href="#probes">Probes</a><a href="#verification">Verification</a></nav>
+<nav class="toc" aria-label="Report sections"><a href="#overview">Overview</a><a href="#stack-diagnostics">Stacks</a><a href="#confirmed_failure">Failures</a><a href="#degraded">Degraded</a><a href="#configuration_warning">Warnings</a><a href="#advisory">Advisories</a><a href="#needs_confirmation">Confirm</a><a href="#probes">Probes</a><a href="#verification">Verification</a></nav>
 {_analysis_notice(context)}
 <section id="overview"><h2>Diagnostic overview</h2><div class="metric-grid">{_metric('Critical', counts['CRITICAL'], 'critical' if counts['CRITICAL'] else 'neutral')}{_metric('High', counts['HIGH'], 'high' if counts['HIGH'] else 'neutral')}{_metric('Medium', counts['MEDIUM'], 'warning' if counts['MEDIUM'] else 'neutral')}{_metric('Low', counts['LOW'])}{_metric('Advisory / confirm', sum(issue.get('classification') in {'ADVISORY','NEEDS_CONFIRMATION'} for issue in issues))}</div><div class="priority"><p class="eyebrow">NEXT CHECK</p><strong>{_h(context['priority'])}</strong></div>{_coverage_table(context['coverage'])}</section>
+<section id="stack-diagnostics"><div class="section-head"><h2>Robotics-stack operational stages</h2><a href="system-blueprint.html#software">Open Blueprint relationships →</a></div>{_software_table(context['stacks'], link_to_blueprint=True) if context['stacks'] else _empty_state('No stack evidence was collected.')}</section>
 {''.join(issue_sections)}
 {probe_section}
 <section id="verification"><h2>Verification workflow</h2><ol><li>Confirm that the affected capability is expected on this robot.</li><li>Run only the displayed read-only checks.</li><li>Apply one human-approved change outside Screwdriver.</li><li>Repeat the original failing check.</li><li>Run a new passive inspection and compare scan IDs.</li></ol></section>
@@ -264,7 +271,8 @@ def render_diagnostic_report(context: dict[str, Any], probes: list[dict[str, Any
 
 
 def _compact_issue(issue: dict[str, Any]) -> str:
-    return f"""<article class="finding severity-{_h(str(issue.get('severity', 'INFO')).lower())}"><div><span class="pill">{_h(issue.get('classification', 'NEEDS_CONFIRMATION'))}</span><h3>{_h(issue.get('title'))}</h3></div><p><strong>Impact:</strong> {_h(issue.get('operational_impact') or 'Impact not established.')}</p><p><strong>Observed:</strong> {_h(_first(issue.get('observed')))}</p></article>"""
+    target = _issue_id(issue)
+    return f"""<article class="finding severity-{_h(str(issue.get('severity', 'INFO')).lower())}"><div><span class="pill">{_h(issue.get('classification', 'NEEDS_CONFIRMATION'))}</span><h3>{_h(issue.get('title'))}</h3></div><p><strong>Impact:</strong> {_h(issue.get('operational_impact') or 'Impact not established.')}</p><p><strong>Observed:</strong> {_h(_first(issue.get('observed')))}</p><a href="diagnostic-report.html#{target}">Open finding evidence and recovery criteria →</a></article>"""
 
 
 def _detailed_issue(issue: dict[str, Any], index: int) -> str:
@@ -284,7 +292,7 @@ def _detailed_issue(issue: dict[str, Any], index: int) -> str:
         if references
         else '<span class="muted">No exact evidence reference accepted.</span>'
     )
-    return f"""<details class="issue severity-{_h(str(issue.get('severity', 'INFO')).lower())}" open><summary><span class="issue-number">{index}</span><span><strong>{_h(issue.get('title'))}</strong><small>{_h(issue.get('severity'))} · {_h(issue.get('classification'))} · observation {_h(issue.get('observation_confidence', issue.get('confidence')))}% · diagnosis {_h(issue.get('diagnosis_confidence', issue.get('confidence')))}%</small></span></summary><div class="issue-body"><div class="two-col"><div><h4>Expected</h4><p>{_h(issue.get('expected_state') or 'No expected state was supplied.')}</p></div><div><h4>Observed</h4>{_list(_string_list(issue.get('observed')), 'No accepted observation.')}</div></div><h4>Operational impact</h4><p>{_h(issue.get('operational_impact') or 'Impact has not been established.')}</p><h4>Evidence</h4><p>{refs}</p><h4>Probable causes</h4>{_list(_string_list(issue.get('probable_causes')), 'Cause not established.')}<h4>Ordered approach</h4>{_ordered(_string_list(issue.get('primary_approach')))}{command_html}<h4>Success criteria</h4>{_list(_string_list(issue.get('success_criteria')), 'Repeat inspection no longer reports the condition.')}</div></details>"""
+    return f"""<details id="{_issue_id(issue)}" class="issue severity-{_h(str(issue.get('severity', 'INFO')).lower())}" open><summary><span class="issue-number">{index}</span><span><strong>{_h(issue.get('title'))}</strong><small>{_h(issue.get('severity'))} · {_h(issue.get('classification'))} · observation {_h(issue.get('observation_confidence', issue.get('confidence')))}% · diagnosis {_h(issue.get('diagnosis_confidence', issue.get('confidence')))}%</small></span></summary><div class="issue-body"><div class="two-col"><div><h4>Expected</h4><p>{_h(issue.get('expected_state') or 'No expected state was supplied.')}</p></div><div><h4>Observed</h4>{_list(_string_list(issue.get('observed')), 'No accepted observation.')}</div></div><h4>Operational impact</h4><p>{_h(issue.get('operational_impact') or 'Impact has not been established.')}</p><h4>Evidence</h4><p>{refs}</p><p><a href="system-blueprint.html#architecture">Open affected architecture in the Blueprint →</a></p><h4>Probable causes</h4>{_list(_string_list(issue.get('probable_causes')), 'Cause not established.')}<h4>Ordered approach</h4>{_ordered(_string_list(issue.get('primary_approach')))}{command_html}<h4>Success criteria</h4>{_list(_string_list(issue.get('success_criteria')), 'Repeat inspection no longer reports the condition.')}</div></details>"""
 
 
 def _working_checks(snapshot: dict[str, Any]) -> list[str]:
@@ -491,12 +499,58 @@ def _network_table(network: dict[str, Any]) -> str:
     return _kv_table({"Default interface": network.get("default_interface"), "Gateway": network.get("default_gateway"), "Internet route": _yes_no(network.get("internet_route_available")), "DNS": ", ".join(dns) or "Not reported"}) + _table(["Role", "Interface", "State", "IPv4", "Mb/s", "Driver"], rows)
 
 
-def _software_table(records: list[dict[str, Any]]) -> str:
+def _software_table(
+    records: list[dict[str, Any]],
+    *,
+    include_anchors: bool = False,
+    link_to_blueprint: bool = False,
+) -> str:
     rows = []
     for item in records:
         details = _mapping(item.get("details"))
-        rows.append([item.get("name"), item.get("category"), item.get("status"), details.get("version") or details.get("detected_packages") or _yes_no(details.get("installed"))])
-    return _table(["Software", "Category", "Status", "Version / evidence"], rows)
+        name = str(item.get("name") or "Unnamed stack")
+        display_name = (
+            f'<a href="system-blueprint.html#stack-{_slug(name)}">{_h(name)}</a>'
+            if link_to_blueprint
+            else _h(name)
+        )
+        rows.append(
+            [
+                display_name,
+                details.get("stack_category") or item.get("category"),
+                details.get("version") or details.get("detected_packages"),
+                _yes_no(details.get("installed")),
+                _yes_no(details.get("configured")),
+                _yes_no(details.get("running")),
+                _yes_no(details.get("connected")),
+                _yes_no(details.get("integrated")),
+                details.get("capability"),
+                details.get("capability_state"),
+                details.get("state") or item.get("status"),
+            ]
+        )
+    return _software_grid(rows, include_anchors=include_anchors, raw_name=True)
+
+
+def _software_grid(
+    rows: list[list[Any]], *, include_anchors: bool, raw_name: bool
+) -> str:
+    headers = [
+        "Stack", "Category", "Version / packages", "Installed", "Configured",
+        "Running", "Connected", "Integrated", "Capability", "Capability state",
+        "Operational stage",
+    ]
+    head = "".join(f"<th>{_h(value)}</th>" for value in headers)
+    body: list[str] = []
+    for row in rows:
+        name_text = re.sub(r"<[^>]+>", "", str(row[0]))
+        row_id = f' id="stack-{_slug(name_text)}"' if include_anchors else ""
+        cells = "".join(
+            f"<td>{value if raw_name and index == 0 else _h(_display(value))}</td>"
+            for index, value in enumerate(row)
+        )
+        body.append(f"<tr{row_id}>{cells}</tr>")
+    return f'<div class="table-wrap"><table><thead><tr>{head}</tr></thead><tbody>{"".join(body)}</tbody></table></div>'
 
 
 def _evidence_appendix(snapshot: dict[str, Any]) -> str:
@@ -529,7 +583,7 @@ def _probe_section(probes: list[dict[str, Any]]) -> str:
 
 
 def _report_metadata(context: dict[str, Any]) -> str:
-    return f"""<section class="metadata"><h2>Report provenance</h2>{_kv_table({'Scan ID': context['scan_id'], 'Snapshot SHA-256': context['snapshot_sha256'], 'Schema': context['schema_version'], 'Collected': context['created_at'], 'Collection duration': context['duration'], 'Analysis engine': context['provider_status'], 'Focus': context.get('focus') or 'Complete system'})}</section>"""
+    return f"""<section class="metadata"><h2>Report provenance</h2>{_kv_table({'Scan ID': context['scan_id'], 'Snapshot SHA-256': context['snapshot_sha256'], 'Schema': context['schema_version'], 'Screwdriver version': context['screwdriver_version'], 'Collected': context['created_at'], 'Collection duration': context['duration'], 'Analysis engine': context['provider_status'], 'Focus': context.get('focus') or 'Complete system'})}</section>"""
 
 
 def _analysis_notice(context: dict[str, Any]) -> str:
@@ -691,7 +745,7 @@ def _friendly_time(value: Any) -> str:
         parsed = datetime.fromisoformat(str(value))
     except (TypeError, ValueError):
         return _display(value)
-    return parsed.strftime("%b %d, %Y · %I:%M:%S %p %Z")
+    return format_report_time(parsed)
 
 
 def _percent(value: Any) -> str:
@@ -728,6 +782,14 @@ def _first(value: Any) -> str:
 def _evidence_id(reference: str) -> str:
     root = reference.split("[", 1)[0].split(".", 1)[0]
     return "evidence-" + re.sub(r"[^a-z0-9_-]+", "-", root.lower()).strip("-")
+
+
+def _slug(value: str) -> str:
+    return re.sub(r"[^a-z0-9_-]+", "-", value.casefold()).strip("-") or "unknown"
+
+
+def _issue_id(issue: dict[str, Any]) -> str:
+    return "issue-" + _slug(str(issue.get("code") or issue.get("title") or "unknown"))
 
 
 def _h(value: Any) -> str:

@@ -8,7 +8,13 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
-from screwdriver.agent_providers import DEFAULT_MODELS, EFFORT_CHOICES, PROVIDER_CHOICES
+from screwdriver import __version__
+from screwdriver.agent_providers import (
+    DEFAULT_MODELS,
+    EFFORT_CHOICES,
+    PROVIDER_CHOICES,
+    resolve_model,
+)
 from screwdriver.agentic import analyze_snapshot_file
 from screwdriver.collectors import collect_host
 from screwdriver.models import (
@@ -19,6 +25,7 @@ from screwdriver.models import (
     SystemSnapshot,
     USBDevice,
 )
+from screwdriver.progress import AnalysisProgress
 from screwdriver.report_time import REPORT_TIMEZONE_NAME, format_report_time
 from screwdriver.storage import (
     ReportPaths,
@@ -59,8 +66,8 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_parser.add_argument(
         "--output",
         type=Path,
-        default=Path("report"),
-        help="Report root containing local/ and agentic/ runs (default: report).",
+        default=Path("reports"),
+        help="Report root containing local/ and agentic/ runs (default: reports).",
     )
     _add_agent_options(inspect_parser)
 
@@ -72,8 +79,8 @@ def build_parser() -> argparse.ArgumentParser:
     analyze_parser.add_argument(
         "--output",
         type=Path,
-        default=Path("report"),
-        help="Report root containing agentic/<timestamp>/ (default: report).",
+        default=Path("reports"),
+        help="Report root containing agentic/<timestamp>/ (default: reports).",
     )
     analyze_parser.add_argument(
         "--focus",
@@ -166,14 +173,10 @@ def _run_inspect(args: argparse.Namespace) -> int:
     )
     print(report)
     if args.agentic:
-        outcome = analyze_snapshot_file(
+        outcome = _run_agentic_analysis(
             report_paths.snapshot,
             run.agentic_directory,
-            provider=args.provider,
-            model=args.model,
-            effort=args.effort,
-            investigate=args.investigate,
-            focus=args.focus,
+            args=args,
             scan_id=run.scan_id,
             collection_duration_seconds=duration,
         )
@@ -202,14 +205,10 @@ def _run_analyze(args: argparse.Namespace) -> int:
         requested_scan_id=source_scan_id,
         allow_existing_local=source_scan_id is not None,
     )
-    outcome = analyze_snapshot_file(
+    outcome = _run_agentic_analysis(
         args.snapshot,
         run.agentic_directory,
-        provider=args.provider,
-        model=args.model,
-        effort=args.effort,
-        investigate=args.investigate,
-        focus=args.focus,
+        args=args,
         scan_id=run.scan_id,
     )
     print("SCREWDRIVER AGENTIC ANALYSIS")
@@ -224,6 +223,50 @@ def _run_analyze(args: argparse.Namespace) -> int:
     print(f"Read-only probes:  {len(outcome.probes)}")
     print("Repairs executed:  no")
     return 0
+
+
+def _run_agentic_analysis(
+    snapshot: Path,
+    output_directory: Path,
+    *,
+    args: argparse.Namespace,
+    scan_id: str,
+    collection_duration_seconds: float | None = None,
+):
+    """Run analysis with a heartbeat so a blocking provider call never looks frozen."""
+
+    resolved_model = resolve_model(args.provider, args.model) if args.provider != "none" else "none"
+    provider_label = {
+        "anthropic": "Anthropic",
+        "openai": "OpenAI",
+        "none": "Deterministic",
+    }[args.provider]
+    progress = AnalysisProgress()
+    progress.start(provider_label, resolved_model, args.effort)
+    try:
+        outcome = analyze_snapshot_file(
+            snapshot,
+            output_directory,
+            provider=args.provider,
+            model=args.model,
+            effort=args.effort,
+            investigate=args.investigate,
+            focus=args.focus,
+            scan_id=scan_id,
+            collection_duration_seconds=collection_duration_seconds,
+            progress=progress.stage,
+        )
+    except KeyboardInterrupt:
+        progress.fail("Agentic analysis interrupted")
+        raise
+    except Exception:
+        progress.fail("Agentic analysis failed")
+        raise
+    else:
+        progress.finish()
+        return outcome
+    finally:
+        progress.close()
 
 
 def format_snapshot(
@@ -247,6 +290,8 @@ def format_snapshot(
         "╰" + "─" * (_WIDTH - 2) + "╯",
         "",
         f"Inspection mode: {mode}",
+        f"Screwdriver:     {__version__}",
+        f"Scan ID:         {paths.snapshot.parent.name if paths else 'pending'}",
         "Probe safety:    PASSIVE",
         f"Report timezone: {REPORT_TIMEZONE_NAME}",
         f"Started:         {format_report_time(started_at)}",
@@ -573,8 +618,8 @@ def format_snapshot(
     if snapshot.software_stack_inventory:
         lines.extend(
             _section(
-                "SOFTWARE STACK INVENTORY",
-                _format_component_inventory(snapshot.software_stack_inventory),
+                "ROBOTICS SOFTWARE STACKS",
+                _format_robotics_stack_inventory(snapshot.software_stack_inventory),
             )
         )
     physical_sensors = [
@@ -785,6 +830,53 @@ def _format_component_inventory(
         )
 
     return lines
+
+
+def _format_robotics_stack_inventory(components: list[Component]) -> list[str]:
+    """Present deterministic stack state, integration, I/O, and capability evidence."""
+
+    lines = [
+        "Installed software is not treated as operational without runtime evidence.",
+        "",
+    ]
+    groups: dict[str, list[Component]] = {}
+    for component in components:
+        category = str(component.details.get("stack_category") or component.category)
+        groups.setdefault(category, []).append(component)
+
+    for category, stacks in groups.items():
+        lines.append(category.upper())
+        for stack in stacks:
+            details = stack.details
+            lines.extend(
+                [
+                    f"  {stack.name}",
+                    _row("    Version", details.get("version")),
+                    _row("    Installed", _yes_no(bool(details.get("installed")))),
+                    _row("    Configured", _tri_state(details.get("configured"))),
+                    _row("    Running", _tri_state(details.get("running"))),
+                    _row("    Connected", _tri_state(details.get("connected"))),
+                    _row("    Integrated", _tri_state(details.get("integrated"))),
+                    _row("    Capability", details.get("capability")),
+                    _row("    Capability state", details.get("capability_state")),
+                    _row("    State", details.get("state") or stack.status.value.upper()),
+                    _row("    Runtime owner", details.get("runtime_owner")),
+                    _row("    Required inputs", details.get("required_inputs")),
+                    _row("    Expected outputs", details.get("expected_outputs")),
+                    _row("    Observed inputs", details.get("observed_inputs")),
+                    _row("    Observed outputs", details.get("observed_outputs")),
+                    _row("    Configuration", details.get("configuration_source")),
+                    _row("    Detected packages", details.get("detected_packages")),
+                    "",
+                ]
+            )
+    return lines
+
+
+def _tri_state(value: object) -> str:
+    if value is None:
+        return "Not evaluated"
+    return _yes_no(bool(value))
 
 
 def _format_ros_sections(snapshot: SystemSnapshot) -> list[str]:

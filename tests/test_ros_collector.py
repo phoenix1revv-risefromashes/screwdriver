@@ -47,6 +47,12 @@ def test_collects_healthy_ros2_environment(
     assert environment.status is ComponentStatus.OK
     assert environment.details["indexed_package_count"] == 4
     assert any(component.name == "Navigation2" for component in components)
+    assert any(component.name == "AMCL" for component in components)
+    nav2 = next(component for component in components if component.name == "Navigation2")
+    assert nav2.details["stack_category"] == "navigation and localization"
+    assert nav2.details["capability"] == "autonomous navigation"
+    assert nav2.details["state"] == "INSTALLED_NOT_EVALUATED"
+    assert nav2.details["running"] is False
     assert any(finding.code == "ROS_ENVIRONMENT_HEALTHY" for finding in findings)
     assert not any(finding.severity is FindingSeverity.ERROR for finding in findings)
 
@@ -75,6 +81,28 @@ def test_reports_invalid_domain_and_missing_rmw(
         "ROS_DOMAIN_ID_INVALID",
         "ROS_RMW_NOT_INSTALLED",
     }
+
+
+def test_collects_stack_package_version(monkeypatch: object, tmp_path: Path) -> None:
+    prefix = _make_ros2_prefix(tmp_path, "slam_toolbox")
+    manifest = prefix / "share" / "slam_toolbox" / "package.xml"
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text(
+        "<package><name>slam_toolbox</name><version>2.8.1</version></package>",
+        encoding="utf-8",
+    )
+    launch = prefix / "share" / "slam_toolbox" / "launch" / "online_async_launch.py"
+    launch.parent.mkdir(parents=True)
+    launch.write_text("# passive fixture", encoding="utf-8")
+    monkeypatch.setattr(ros, "_ROS_ROOT", prefix.parent)  # type: ignore[attr-defined]
+    monkeypatch.setattr(ros.shutil, "which", lambda _executable: None)  # type: ignore[attr-defined]
+
+    components, _ = ros.collect_robotics_software()
+    slam = next(component for component in components if component.name == "SLAM Toolbox")
+
+    assert slam.details["version"] == "slam_toolbox 2.8.1"
+    assert slam.details["configured"] is True
+    assert "online_async_launch.py" in str(slam.details["configuration_source"])
 
 
 def test_reports_missing_dds_file(monkeypatch: object, tmp_path: Path) -> None:
@@ -107,6 +135,16 @@ def test_no_ros_is_informational(monkeypatch: object, tmp_path: Path) -> None:
     components, findings = ros.collect_robotics_software()
 
     assert components[0].status is ComponentStatus.UNKNOWN
+    stack_states = {
+        component.name: component.details["state"]
+        for component in components
+        if component.category == "robotics software stack"
+    }
+    assert stack_states["Navigation2"] == "NOT_INSTALLED"
+    assert stack_states["AMCL"] == "NOT_INSTALLED"
+    assert stack_states["SLAM Toolbox"] == "NOT_INSTALLED"
+    assert stack_states["ros2_control"] == "NOT_INSTALLED"
+    assert stack_states["MoveIt"] == "NOT_INSTALLED"
     assert any(finding.code == "ROS_NOT_DETECTED" for finding in findings)
     assert not any(finding.severity is FindingSeverity.ERROR for finding in findings)
 

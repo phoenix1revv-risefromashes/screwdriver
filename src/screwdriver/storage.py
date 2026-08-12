@@ -5,10 +5,12 @@ from __future__ import annotations
 import hashlib
 import html
 import json
+import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from screwdriver import __version__
 from screwdriver.models import Component, SystemSnapshot
 from screwdriver.report_time import report_isoformat, to_report_timezone
 
@@ -43,7 +45,7 @@ def create_report_run(
     """Reserve a non-overwriting timestamp directory for one report run."""
 
     instant = created_at or datetime.now(UTC)
-    base_id = requested_scan_id or to_report_timezone(instant).strftime("%Y-%m-%d_%H-%M-%S")
+    base_id = requested_scan_id or to_report_timezone(instant).strftime("%Y-%m-%d_%H:%M:%S")
     scan_id = base_id
     suffix = 1
     while (
@@ -73,18 +75,31 @@ def save_reports(
     output_directory.mkdir(parents=True, exist_ok=True)
     paths = build_report_paths(output_directory)
 
-    paths.snapshot.write_text(
-        json.dumps(snapshot.to_dict(), indent=2) + "\n",
-        encoding="utf-8",
+    snapshot_payload = (json.dumps(snapshot.to_dict(), indent=2) + "\n").encode("utf-8")
+    snapshot_fingerprint = hashlib.sha256(snapshot_payload).hexdigest()
+    resolved_scan_id = scan_id or output_directory.name
+    enriched_report = "\n".join(
+        [
+            terminal_report,
+            "",
+            "PROVENANCE",
+            "─" * 72,
+            f"Scan ID:          {resolved_scan_id}",
+            f"Snapshot SHA-256: {snapshot_fingerprint}",
+            f"Schema version:   {snapshot.schema_version}",
+            f"Screwdriver:      {__version__}",
+        ]
     )
 
+    paths.snapshot.write_bytes(snapshot_payload)
+
     paths.text_report.write_text(
-        terminal_report + "\n",
+        enriched_report + "\n",
         encoding="utf-8",
     )
 
     paths.html_report.write_text(
-        _build_html_report(snapshot, terminal_report),
+        _build_html_report(snapshot, enriched_report),
         encoding="utf-8",
     )
 
@@ -110,14 +125,14 @@ def save_reports(
         encoding="utf-8",
     )
 
-    snapshot_fingerprint = hashlib.sha256(paths.snapshot.read_bytes()).hexdigest()
     (output_directory / "report-manifest.json").write_text(
         json.dumps(
             {
                 "report_kind": "local",
-                "scan_id": scan_id or output_directory.name,
+                "scan_id": resolved_scan_id,
                 "created_at": report_isoformat(snapshot.created_at),
                 "schema_version": snapshot.schema_version,
+                "screwdriver_version": __version__,
                 "hostname": snapshot.identity.hostname,
                 "collection_duration_seconds": duration_seconds,
                 "snapshot_sha256": snapshot_fingerprint,
@@ -135,8 +150,24 @@ def save_reports(
         + "\n",
         encoding="utf-8",
     )
+    update_latest_reference(output_directory)
 
     return paths
+
+
+def update_latest_reference(run_directory: Path) -> None:
+    """Atomically point a report type's ``latest`` symlink at a completed scan."""
+
+    parent = run_directory.parent
+    parent.mkdir(parents=True, exist_ok=True)
+    latest = parent / "latest"
+    temporary = parent / f".latest-{os.getpid()}-{run_directory.name}"
+    try:
+        temporary.unlink(missing_ok=True)
+        temporary.symlink_to(run_directory.name, target_is_directory=True)
+        os.replace(temporary, latest)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def build_report_paths(output_directory: Path) -> ReportPaths:
@@ -161,6 +192,7 @@ def _build_html_report(
     usb_details = _build_usb_details(snapshot)
     serial_details = _build_serial_details(snapshot)
     inventory_details = _build_inventory_details(snapshot)
+    robotics_stack_details = _build_robotics_stack_details(snapshot)
 
     return f"""<!doctype html>
 <html lang="en">
@@ -223,6 +255,7 @@ def _build_html_report(
     <pre>{content}</pre>
     {usb_details}
     {serial_details}
+    {robotics_stack_details}
     {inventory_details}
   </main>
 </body>
@@ -364,7 +397,6 @@ def _build_inventory_details(snapshot: SystemSnapshot) -> str:
         sections.append(_build_ros_overview_table(overview))
 
     groups = [
-        ("Software stack inventory", snapshot.software_stack_inventory),
         ("Physical sensor inventory", physical_sensors),
         ("Physical actuator / control inventory", physical_actuators),
         *[
@@ -410,6 +442,51 @@ def _build_inventory_details(snapshot: SystemSnapshot) -> str:
             sections.append(table)
 
     return "".join(sections)
+
+
+def _build_robotics_stack_details(snapshot: SystemSnapshot) -> str:
+    """Render the local robotics-stack summary with operational-stage semantics."""
+
+    if not snapshot.software_stack_inventory:
+        return ""
+    rows: list[str] = []
+    for component in snapshot.software_stack_inventory:
+        details = component.details
+        values = (
+            component.name,
+            details.get("stack_category") or component.category,
+            details.get("version"),
+            _html_bool(details.get("installed")),
+            _html_bool(details.get("configured"), unknown="Not evaluated"),
+            _html_bool(details.get("running")),
+            _html_bool(details.get("connected"), unknown="Not evaluated"),
+            _html_bool(details.get("integrated")),
+            details.get("capability"),
+            details.get("capability_state"),
+            details.get("state") or component.status.value,
+        )
+        cells = "".join(f"<td>{html.escape(_html_value(value))}</td>" for value in values)
+        rows.append(f"<tr>{cells}</tr>")
+    return f"""
+<section id="robotics-software-stacks">
+  <h2>Robotics software stacks</h2>
+  <p>Package presence alone is not proof that a stack is configured, running, or integrated.</p>
+  <table>
+    <thead><tr>
+      <th>Stack</th><th>Category</th><th>Version</th><th>Installed</th>
+      <th>Configured</th><th>Running</th><th>Connected</th><th>Integrated</th>
+      <th>Capability</th><th>Capability state</th><th>Operational stage</th>
+    </tr></thead>
+    <tbody>{''.join(rows)}</tbody>
+  </table>
+</section>
+"""
+
+
+def _html_bool(value: object, *, unknown: str = "No") -> str:
+    if value is None:
+        return unknown
+    return "Yes" if bool(value) else "No"
 
 
 def _build_component_table(title: str, components: list[Component]) -> str:

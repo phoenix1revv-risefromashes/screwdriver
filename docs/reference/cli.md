@@ -28,15 +28,26 @@ This mode:
 - Does not diagnose problems
 - Does not change the system
 
+The local text and HTML reports include a deterministic **Robotics Software Stacks**
+section. For each detected stack it shows category, installed/configured/running/
+connected/integrated state, supported capability, expected inputs and outputs, runtime
+owner, and the operational stage supported by evidence. An installed package is never
+presented as operational by itself.
+
 Generated files:
 
 ```text
-report/local/<date_timestamp>/snapshot.json
-report/local/<date_timestamp>/report.txt
-report/local/<date_timestamp>/report.html
-report/local/<date_timestamp>/inspection.log
-report/local/<date_timestamp>/report-manifest.json
+reports/local/<date_timestamp>/snapshot.json
+reports/local/<date_timestamp>/report.txt
+reports/local/<date_timestamp>/report.html
+reports/local/<date_timestamp>/inspection.log
+reports/local/<date_timestamp>/report-manifest.json
+reports/local/latest -> <date_timestamp>
 ```
+
+`<date_timestamp>` is Los Angeles local time formatted exactly as
+`YYYY-MM-DD_HH:MM:SS`, such as `2026-08-11_06:46:42`. The `latest` symlink is
+replaced atomically only after the scan artifacts and manifest are complete.
 
 Running `inspect` without a mode defaults to local:
 
@@ -67,14 +78,15 @@ This mode:
 Generated files:
 
 ```text
-report/local/<date_timestamp>/snapshot.json
-report/local/<date_timestamp>/report.txt
-report/local/<date_timestamp>/report.html
-report/local/<date_timestamp>/inspection.log
-report/agentic/<same_date_timestamp>/compact_snapshot.html
-report/agentic/<same_date_timestamp>/system-blueprint.html
-report/agentic/<same_date_timestamp>/diagnostic-report.html
-report/agentic/<same_date_timestamp>/agent-analysis.json
+reports/local/<date_timestamp>/snapshot.json
+reports/local/<date_timestamp>/report.txt
+reports/local/<date_timestamp>/report.html
+reports/local/<date_timestamp>/inspection.log
+reports/agentic/<same_date_timestamp>/compact_snapshot.html
+reports/agentic/<same_date_timestamp>/system-blueprint.html
+reports/agentic/<same_date_timestamp>/diagnostic-report.html
+reports/agentic/<same_date_timestamp>/agent-analysis.json
+reports/agentic/latest -> <same_date_timestamp>
 ```
 
 The compact snapshot contains only the operationally useful overview: evidence
@@ -82,10 +94,19 @@ state, working checks, actionable findings, unknowns, next check, data flow, and
 coverage. The blueprint and diagnostic report retain the detailed engineering
 evidence. Provider availability is report-generation metadata, not robot health.
 
+All three reports include robotics-stack state. Compact stack rows link to stable
+Blueprint stack anchors; compact findings link to exact Diagnostic findings; Diagnostic
+findings link back to Blueprint architecture and the categorized evidence appendix.
+
 The complete `snapshot.json` remains local. Agentic analysis supports Anthropic and
 OpenAI. API keys are read from `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` and are never
 stored in a report. The evidence view removes machine IDs, serial numbers, MAC
 addresses, and the default gateway before model analysis.
+
+While the provider is running, the terminal reports the selected provider, model, and
+effort, then displays evidence preparation, provider wait, validation, report generation,
+and save stages. A spinner and elapsed time are shown on a TTY. Redirected output stays
+line-based, and terminal state is restored after success, failure, or interruption.
 
 A focused inspection can be requested with:
 
@@ -138,20 +159,26 @@ The command:
 - Recommends safe fixes
 - Never executes the recommended fixes
 
+The provider evidence package uses a stable bounded schema, removes duplicate records,
+redacts sensitive structured fields and free text, and lists every truncated or omitted
+path. Transient HTTP/provider failures use bounded retry/backoff. Provider conclusions
+are accepted only after schema and snapshot-reference validation.
+
 Generated files:
 
 ```text
-report/agentic/<date_timestamp>/compact_snapshot.html
-report/agentic/<date_timestamp>/system-blueprint.html
-report/agentic/<date_timestamp>/diagnostic-report.html
-report/agentic/<date_timestamp>/agent-analysis.json
+reports/agentic/<date_timestamp>/compact_snapshot.html
+reports/agentic/<date_timestamp>/system-blueprint.html
+reports/agentic/<date_timestamp>/diagnostic-report.html
+reports/agentic/<date_timestamp>/agent-analysis.json
+reports/agentic/latest -> <date_timestamp>
 ```
 
 Example:
 
 ```bash
 screwdriver analyze snapshot.json \
-  --output report
+  --output reports
 ```
 
 `--investigate` authorizes at most four additional probes chosen from a closed
@@ -182,3 +209,18 @@ Screwdriver must never automatically:
 - Execute AI-generated repair commands
 
 Every recommendation remains under human control.
+
+## Robotics software-stack coverage
+
+Screwdriver passively identifies and reports:
+
+- ROS 1/ROS 2 environments, distributions, workspaces, RMW/DDS, and graph entities
+- Nav2, AMCL, Robot Localization, SLAM Toolbox, Cartographer, and RTAB-Map
+- `ros2_control`, controller interfaces, MoveIt, and trajectory execution components
+- Camera/LiDAR perception, AI runtimes, audio, speech, and interaction pipelines
+- micro-ROS and observable MCU bridges
+- Gazebo/ROS simulation, visualization, development sandboxes, and containers
+- Teleoperation, rosbag, diagnostics, monitoring, and telemetry
+
+Runtime evidence distinguishes `NOT_INSTALLED`, `INSTALLED_NOT_EVALUATED`, `RUNNING`,
+connected, integrated, inactive, and unavailable states without activating hardware.

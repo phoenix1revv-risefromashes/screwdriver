@@ -157,7 +157,9 @@ def test_running_graph_discovers_endpoints_controllers_and_correlations(
     )
     assert ros_camera.details["physical_component"] == "Camera"
     navigation = next(item for item in result.software_stacks if item.name == "Navigation2")
-    assert navigation.details["state"] == "RUNNING"
+    assert navigation.details["state"] == "RUNNING_MISSING_REQUIRED_INPUT"
+    assert navigation.details["capability_state"] == "BLOCKED"
+    assert navigation.details["observed_outputs"] == "/cmd_vel"
     assert any(finding.code == "ROS_RUNTIME_DISCOVERED" for finding in result.findings)
     graph_list_calls = [
         command
@@ -361,7 +363,7 @@ def test_ros_lidar_is_mapped_to_exact_usb_uart_device_from_node_configuration(
     assert ros_lidar.details["confidence"] == "CONFIGURED_PATH_MATCH"
 
 
-def test_software_inventory_omits_components_that_are_not_detected(
+def test_robotics_stack_catalog_keeps_explicit_not_installed_state(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(runtime.shutil, "which", lambda _name: None)
@@ -375,7 +377,45 @@ def test_software_inventory_omits_components_that_are_not_detected(
 
     result = runtime.collect_runtime_inventory([missing], [], [])
 
-    assert result.software_stacks == []
+    assert len(result.software_stacks) == 1
+    assert result.software_stacks[0].name == "Missing optional stack"
+    assert result.software_stacks[0].details["state"] == "NOT_INSTALLED"
+    assert result.software_stacks[0].details["capability_state"] == "UNAVAILABLE"
+
+
+def test_running_slam_reports_missing_input_and_blocked_capability(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(runtime.shutil, "which", lambda _name: "/usr/bin/ros2")
+    slam = Component(
+        category="robotics software stack",
+        name="SLAM Toolbox",
+        status=ComponentStatus.OK,
+        details={"installed": True, "configured": True, "capability": "mapping"},
+    )
+
+    result = runtime._software_inventory(
+        [slam],
+        process_text="slam_toolbox",
+        ros_graph_running=True,
+        nodes=["/slam_toolbox"],
+        topics=[("/map", "nav_msgs/msg/OccupancyGrid")],
+    )
+
+    assert result[0].details["state"] == "RUNNING_MISSING_REQUIRED_INPUT"
+    assert result[0].details["capability_state"] == "BLOCKED"
+    assert result[0].details["observed_outputs"] == "/map"
+
+
+def test_process_identity_ignores_arbitrary_shell_arguments() -> None:
+    tokens = runtime._process_identity_tokens(
+        "bash",
+        ["/usr/bin/bash", "-lc", "rg AMCL MoveIt SLAM Toolbox"],
+    )
+
+    assert tokens == ["bash"]
+    assert runtime._component_running("AMCL", "\n".join(tokens)) is False
+    assert runtime._component_running("MoveIt", "\n".join(tokens)) is False
 
 
 def test_graph_discovery_uses_environment_recovered_from_running_ros_process(
