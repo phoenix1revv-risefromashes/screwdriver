@@ -581,7 +581,9 @@ def _impact_for_code(code: str, classification: str) -> str:
     if code.startswith("MEMORY_"):
         return "Processes may experience reclaim pressure, latency, or termination if usage grows."
     if code.startswith("FILESYSTEM_"):
-        return "Logs, recordings, datasets, or application writes may fail when capacity is exhausted."
+        return (
+            "Logs, recordings, datasets, or application writes may fail when capacity is exhausted."
+        )
     if code.startswith("THERMAL_"):
         return "The computer may throttle or shut down to protect hardware."
     return "The affected robot capability and operating impact require confirmation."
@@ -1517,7 +1519,9 @@ def _valid_classification(value: Any, existing: DiagnosticIssue | None) -> str:
         "ADVISORY",
         "NEEDS_CONFIRMATION",
     }
-    return text if text in allowed else (existing.classification if existing else "NEEDS_CONFIRMATION")
+    return (
+        text if text in allowed else (existing.classification if existing else "NEEDS_CONFIRMATION")
+    )
 
 
 def _bounded_int(value: Any, default: int) -> int:
@@ -1658,8 +1662,10 @@ def _deduplicate_issues(issues: list[DiagnosticIssue]) -> list[DiagnosticIssue]:
 
 def _semantic_issue_key(issue: DiagnosticIssue) -> str:
     text = f"{issue.code} {issue.title}".casefold()
-    if "ros" in text and "environment" in text and any(
-        token in text for token in ("source", "shell", "recover")
+    if (
+        "ros" in text
+        and "environment" in text
+        and any(token in text for token in ("source", "shell", "recover"))
     ):
         return "ros-environment-context"
     if "serial" in text and any(token in text for token in ("access", "permission")):

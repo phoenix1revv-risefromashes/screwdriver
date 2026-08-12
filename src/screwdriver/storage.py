@@ -48,9 +48,9 @@ def create_report_run(
     base_id = requested_scan_id or to_report_timezone(instant).strftime("%Y-%m-%d_%H:%M:%S")
     scan_id = base_id
     suffix = 1
-    while (
-        (report_root / "local" / scan_id).exists() and not allow_existing_local
-    ) or (report_root / "agentic" / scan_id).exists():
+    while ((report_root / "local" / scan_id).exists() and not allow_existing_local) or (
+        report_root / "agentic" / scan_id
+    ).exists():
         scan_id = f"{base_id}_{suffix:02d}"
         suffix += 1
 
@@ -477,7 +477,7 @@ def _build_robotics_stack_details(snapshot: SystemSnapshot) -> str:
       <th>Configured</th><th>Running</th><th>Connected</th><th>Integrated</th>
       <th>Capability</th><th>Capability state</th><th>Operational stage</th>
     </tr></thead>
-    <tbody>{''.join(rows)}</tbody>
+    <tbody>{"".join(rows)}</tbody>
   </table>
 </section>
 """

@@ -1668,11 +1668,14 @@ def _software_inventory(
             connected = bool(observed_inputs)
         integrated: bool | None = None
         if connected and observed_inputs:
-            integrated = any(
-                _endpoint_matches(endpoint, hardware_endpoint)
-                for endpoint in observed_inputs
-                for hardware_endpoint in hardware_endpoints
-            ) or None
+            integrated = (
+                any(
+                    _endpoint_matches(endpoint, hardware_endpoint)
+                    for endpoint in observed_inputs
+                    for hardware_endpoint in hardware_endpoints
+                )
+                or None
+            )
         details.update(
             {
                 "installed": installed,

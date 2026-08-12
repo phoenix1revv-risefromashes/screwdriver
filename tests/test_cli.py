@@ -457,9 +457,7 @@ def test_agentic_mode_separates_local_and_agentic_report_sets(
     assert "Diagnostic report:" in output
     assert "Problems reported:" in output
     local_runs = [path for path in (tmp_path / "local").iterdir() if path.name != "latest"]
-    agentic_runs = [
-        path for path in (tmp_path / "agentic").iterdir() if path.name != "latest"
-    ]
+    agentic_runs = [path for path in (tmp_path / "agentic").iterdir() if path.name != "latest"]
     assert len(local_runs) == len(agentic_runs) == 1
     assert local_runs[0].name == agentic_runs[0].name
     assert (local_runs[0] / "snapshot.json").is_file()
@@ -478,9 +476,7 @@ def test_repeated_inspections_never_overwrite_timestamped_runs(tmp_path: Path) -
         assert main(["inspect", "--output", str(tmp_path)]) == 0
         assert main(["inspect", "--output", str(tmp_path)]) == 0
 
-    runs = sorted(
-        path.name for path in (tmp_path / "local").iterdir() if path.name != "latest"
-    )
+    runs = sorted(path.name for path in (tmp_path / "local").iterdir() if path.name != "latest")
     assert runs == ["2026-08-10_05:00:00", "2026-08-10_05:00:00_01"]
     assert all((tmp_path / "local" / run / "snapshot.json").is_file() for run in runs)
     assert (tmp_path / "local" / "latest").resolve().name == "2026-08-10_05:00:00_01"
@@ -605,9 +601,7 @@ def test_analyze_existing_snapshot_generates_timestamped_agentic_reports(
     output = capsys.readouterr().out
     assert "SCREWDRIVER AGENTIC ANALYSIS" in output
     assert "Repairs executed:  no" in output
-    runs = [
-        path for path in (output_path / "agentic").iterdir() if path.name != "latest"
-    ]
+    runs = [path for path in (output_path / "agentic").iterdir() if path.name != "latest"]
     assert len(runs) == 1
     assert (output_path / "agentic" / "latest").resolve() == runs[0].resolve()
     assert (runs[0] / "compact_snapshot.html").is_file()

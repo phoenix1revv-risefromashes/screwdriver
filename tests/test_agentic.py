@@ -317,7 +317,7 @@ def test_agentic_html_humanizes_bytes_uptime_and_container_values(tmp_path: Path
     assert "19 min 37 sec" in blueprint
     assert "465.8 GiB" in blueprint
     assert "<td>500107862016</td>" not in blueprint
-    assert '[&quot;uvcvideo&quot;]' not in blueprint
+    assert "[&quot;uvcvideo&quot;]" not in blueprint
 
 
 class _FakeAnthropicResponse:
@@ -406,9 +406,9 @@ def test_anthropic_retries_transient_failure_and_records_request_metadata(
         assert timeout == 120
         attempts += 1
         if attempts == 1:
-            error_body = json.dumps(
-                {"error": {"message": "temporarily unavailable"}}
-            ).encode("utf-8")
+            error_body = json.dumps({"error": {"message": "temporarily unavailable"}}).encode(
+                "utf-8"
+            )
             raise urllib.error.HTTPError(
                 request.full_url,
                 503,

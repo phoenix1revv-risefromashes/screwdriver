@@ -624,9 +624,7 @@ def _collect_package_names(prefixes: list[str], ros_version: int | None) -> set[
     return packages
 
 
-def _collect_package_versions(
-    prefixes: list[str], packages: set[str]
-) -> dict[str, str]:
+def _collect_package_versions(prefixes: list[str], packages: set[str]) -> dict[str, str]:
     """Read package.xml versions for only the stack packages Screwdriver recognizes."""
 
     candidates = {
@@ -731,9 +729,7 @@ def _package_component(
         if package in package_versions
     ]
     configuration_sources = [
-        path
-        for package in matches
-        for path in package_configurations.get(package, [])
+        path for package in matches for path in package_configurations.get(package, [])
     ]
     return Component(
         category="robotics software stack",
