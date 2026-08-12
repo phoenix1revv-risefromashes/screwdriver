@@ -16,8 +16,9 @@ import subprocess
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Protocol, cast
 
+from screwdriver import __version__
 from screwdriver.agent_providers import (
     EFFORT_CHOICES,
     PROVIDER_CHOICES,
@@ -34,11 +35,16 @@ from screwdriver.agentic_reports import (
     render_diagnostic_report,
     render_system_blueprint,
 )
+from screwdriver.storage import update_latest_reference
 
 _DEFAULT_EFFORT = "medium"
 _MAX_OUTPUT_TOKENS = 12_000
 _MAX_PROBES = 4
 _MAX_PROBE_OUTPUT = 12_000
+
+
+class ProgressCallback(Protocol):
+    def __call__(self, number: int, label: str, waiting: bool = False) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,9 +168,12 @@ def analyze_snapshot_file(
     focus: str | None = None,
     scan_id: str | None = None,
     collection_duration_seconds: float | None = None,
+    progress: ProgressCallback | None = None,
 ) -> AnalysisOutcome:
     """Analyze a saved snapshot and write compact plus detailed agentic reports."""
 
+    if progress:
+        progress(1, "Preparing and redacting system evidence…")
     snapshot = _load_snapshot(snapshot_path)
     resolved_scan_id = scan_id or output_directory.name
     snapshot_sha256 = hashlib.sha256(snapshot_path.read_bytes()).hexdigest()
@@ -192,6 +201,9 @@ def analyze_snapshot_file(
     if provider != "none":
         adapter = get_provider(provider)
         try:
+            if progress:
+                progress(2, f"Sending evidence to {adapter.display_name}…")
+                progress(3, f"Waiting for {resolved_model} analysis…", True)
             provider_response = _provider_analysis(
                 snapshot,
                 deterministic_baseline,
@@ -205,6 +217,8 @@ def analyze_snapshot_file(
                 f"{adapter.display_name} unavailable; deterministic fallback ({exception})"
             )
         else:
+            if progress:
+                progress(4, "Validating findings against collected evidence…")
             provider_status = _provider_status(adapter, resolved_model, provider_response)
             response = provider_response.analysis
             summary = _clean_text(response.get("summary")) or summary
@@ -249,6 +263,10 @@ def analyze_snapshot_file(
                             revised.get("issues"),
                         )
 
+    if progress and provider == "none":
+        progress(4, "Validating deterministic findings against collected evidence…")
+    if progress:
+        progress(5, "Generating diagnostic reports…")
     output_directory.mkdir(parents=True, exist_ok=True)
     context = build_report_context(
         snapshot,
@@ -262,6 +280,8 @@ def analyze_snapshot_file(
         collection_duration_seconds=collection_duration_seconds,
         focus=focus,
     )
+    if progress:
+        progress(6, "Saving reports and manifests…")
     paths.compact.write_text(render_compact_snapshot(context), encoding="utf-8")
     paths.blueprint.write_text(
         render_system_blueprint(context, snapshot),
@@ -277,6 +297,7 @@ def analyze_snapshot_file(
                 "source_snapshot": str(snapshot_path),
                 "scan_id": resolved_scan_id,
                 "snapshot_sha256": snapshot_sha256,
+                "screwdriver_version": __version__,
                 "provider": provider,
                 "model": resolved_model,
                 "requested_effort": effort,
@@ -306,6 +327,7 @@ def analyze_snapshot_file(
                 "scan_id": resolved_scan_id,
                 "source_snapshot": str(snapshot_path),
                 "snapshot_sha256": snapshot_sha256,
+                "screwdriver_version": __version__,
                 "provider": provider,
                 "model": resolved_model,
                 "requested_effort": effort,
@@ -325,6 +347,7 @@ def analyze_snapshot_file(
         + "\n",
         encoding="utf-8",
     )
+    update_latest_reference(output_directory)
     return AnalysisOutcome(
         paths=paths,
         provider_status=provider_status,
@@ -558,7 +581,9 @@ def _impact_for_code(code: str, classification: str) -> str:
     if code.startswith("MEMORY_"):
         return "Processes may experience reclaim pressure, latency, or termination if usage grows."
     if code.startswith("FILESYSTEM_"):
-        return "Logs, recordings, datasets, or application writes may fail when capacity is exhausted."
+        return (
+            "Logs, recordings, datasets, or application writes may fail when capacity is exhausted."
+        )
     if code.startswith("THERMAL_"):
         return "The computer may throttle or shut down to protect hardware."
     return "The affected robot capability and operating impact require confirmation."
@@ -783,11 +808,24 @@ def _bounded_value(
             omissions.append(f"{path}: string truncated from {len(redacted)} characters")
         return redacted[:1200]
     if isinstance(value, list):
-        if len(value) > 100:
-            omissions.append(f"{path}: {len(value) - 100} records omitted")
+        normalized: list[Any] = []
+        seen: set[str] = set()
+        duplicate_count = 0
+        for item in value:
+            if isinstance(item, (dict, list)):
+                marker = json.dumps(item, sort_keys=True, default=str, ensure_ascii=False)
+                if marker in seen:
+                    duplicate_count += 1
+                    continue
+                seen.add(marker)
+            normalized.append(item)
+        if duplicate_count:
+            omissions.append(f"{path}: {duplicate_count} duplicate records removed")
+        if len(normalized) > 100:
+            omissions.append(f"{path}: {len(normalized) - 100} records omitted")
         return [
             _bounded_value(item, depth + 1, path=f"{path}[{index}]", omissions=omissions)
-            for index, item in enumerate(value[:100])
+            for index, item in enumerate(normalized[:100])
         ]
     if isinstance(value, dict):
         redacted_keys = {
@@ -1481,7 +1519,9 @@ def _valid_classification(value: Any, existing: DiagnosticIssue | None) -> str:
         "ADVISORY",
         "NEEDS_CONFIRMATION",
     }
-    return text if text in allowed else (existing.classification if existing else "NEEDS_CONFIRMATION")
+    return (
+        text if text in allowed else (existing.classification if existing else "NEEDS_CONFIRMATION")
+    )
 
 
 def _bounded_int(value: Any, default: int) -> int:
@@ -1622,8 +1662,10 @@ def _deduplicate_issues(issues: list[DiagnosticIssue]) -> list[DiagnosticIssue]:
 
 def _semantic_issue_key(issue: DiagnosticIssue) -> str:
     text = f"{issue.code} {issue.title}".casefold()
-    if "ros" in text and "environment" in text and any(
-        token in text for token in ("source", "shell", "recover")
+    if (
+        "ros" in text
+        and "environment" in text
+        and any(token in text for token in ("source", "shell", "recover"))
     ):
         return "ros-environment-context"
     if "serial" in text and any(token in text for token in ("access", "permission")):

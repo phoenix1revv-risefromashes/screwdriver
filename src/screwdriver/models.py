@@ -556,7 +556,7 @@ class SystemSnapshot:
     actuator_inventory: list[Component] = field(default_factory=list)
     ros_device_inventory: list[Component] = field(default_factory=list)
     ros_runtime_inventory: list[Component] = field(default_factory=list)
-    schema_version: str = "3.1"
+    schema_version: str = "3.2"
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     components: list[Component] = field(default_factory=list)
     findings: list[Finding] = field(default_factory=list)

@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import psutil
 
@@ -160,16 +161,65 @@ _DEVICE_TOPIC_TOKENS = (
 
 _RUNNING_HINTS = {
     "Navigation2": ("nav2", "planner_server", "controller_server", "bt_navigator"),
+    "AMCL": ("amcl",),
+    "Robot Localization": ("ekf_node", "ukf_node", "navsat_transform"),
     "MoveIt": ("move_group", "moveit"),
     "ros2_control": ("controller_manager", "ros2_control_node"),
     "SLAM Toolbox": ("slam_toolbox",),
+    "Cartographer": ("cartographer",),
+    "RTAB-Map": ("rtabmap",),
     "RViz": ("rviz", "rviz2"),
     "Robot State Publisher": ("robot_state_publisher",),
     "Gazebo ROS integration": ("gazebo", "gzserver", "gz_sim", "ros_gz"),
+    "Isaac ROS": ("isaac_ros", "nitros"),
+    "Webots ROS integration": ("webots",),
     "Camera drivers": ("camera", "usb_cam", "v4l2", "realsense"),
     "LiDAR drivers": ("lidar", "laser", "rplidar", "velodyne", "ouster"),
     "micro-ROS": ("micro_ros",),
+    "Audio and speech": ("audio_capture", "audio_play", "speech", "whisper", "tts"),
+    "Teleoperation": ("teleop", "joy_node"),
+    "Rosbag": ("ros2 bag", "rosbag2"),
+    "Diagnostics": ("diagnostic_aggregator", "diagnostic_updater"),
     "Docker": ("dockerd", "docker"),
+    "Podman": ("podman",),
+    "Apptainer": ("apptainer", "singularity"),
+    "Webots": ("webots",),
+    "Isaac Sim": ("isaac-sim", "isaac sim"),
+}
+
+_STACK_ENDPOINT_PROFILES: dict[str, dict[str, tuple[str, ...]]] = {
+    "Navigation2": {
+        "inputs": ("scan", "map", "odom"),
+        "outputs": ("cmd_vel", "navigate_to_pose", "follow_path"),
+    },
+    "AMCL": {
+        "inputs": ("scan", "map", "odom"),
+        "outputs": ("amcl_pose", "particlecloud"),
+    },
+    "Robot Localization": {
+        "inputs": ("imu", "odom", "gps", "gnss"),
+        "outputs": ("odometry/filtered",),
+    },
+    "SLAM Toolbox": {
+        "inputs": ("scan", "odom"),
+        "outputs": ("map", "pose"),
+    },
+    "Cartographer": {
+        "inputs": ("scan", "points", "imu", "odom"),
+        "outputs": ("map", "submap"),
+    },
+    "RTAB-Map": {
+        "inputs": ("image", "depth", "odom"),
+        "outputs": ("map", "cloud", "pose"),
+    },
+    "ros2_control": {
+        "inputs": ("cmd_vel", "joint_trajectory"),
+        "outputs": ("joint_states", "controller_state"),
+    },
+    "MoveIt": {
+        "inputs": ("joint_states", "planning_scene"),
+        "outputs": ("follow_joint_trajectory", "display_planned_path"),
+    },
 }
 
 
@@ -482,6 +532,9 @@ def collect_runtime_inventory(
             process_text=process_text,
             ros_graph_running=graph_running,
             nodes=nodes,
+            topics=topics,
+            actions=actions,
+            hardware_endpoints=_hardware_endpoints(devices),
         ),
         sensors=_deduplicate(sensors),
         actuators=_deduplicate(actuators),
@@ -1571,28 +1624,72 @@ def _software_inventory(
     process_text: str,
     ros_graph_running: bool,
     nodes: list[str] | None = None,
+    topics: list[tuple[str, str]] | None = None,
+    actions: list[tuple[str, str]] | None = None,
+    hardware_endpoints: set[str] | None = None,
 ) -> list[Component]:
     runtime_text = f"{process_text} {' '.join(nodes or [])}".lower()
+    endpoints = [name for name, _type in [*(topics or []), *(actions or [])]]
+    hardware_endpoints = hardware_endpoints or set()
     inventory: list[Component] = []
     for component in components:
         installed = _component_installed(component)
         running = _component_running(component.name, runtime_text)
+        catalog_stack = component.category in {
+            "robotics stack",
+            "robotics software stack",
+        }
+        profile = _STACK_ENDPOINT_PROFILES.get(component.name, {})
+        observed_inputs = _matching_endpoints(endpoints, profile.get("inputs", ()))
+        observed_outputs = _matching_endpoints(endpoints, profile.get("outputs", ()))
         if component.category == "ROS environment" and ros_graph_running:
             state = "RUNNING"
             running = True
         elif running:
             state = "RUNNING"
+            if profile.get("inputs") and not observed_inputs:
+                state = "RUNNING_MISSING_REQUIRED_INPUT"
+            elif profile.get("outputs") and not observed_outputs:
+                state = "RUNNING_NO_EXPECTED_OUTPUT_OBSERVED"
         elif installed:
-            state = "INSTALLED"
+            state = (
+                "CONFIGURED_INACTIVE"
+                if component.details.get("configured")
+                else "INSTALLED_INACTIVE"
+            )
+        elif catalog_stack:
+            state = "NOT_INSTALLED"
         else:
             continue
 
         details = component.details.copy()
+        connected: bool | None = None
+        if running and profile:
+            connected = bool(observed_inputs)
+        integrated: bool | None = None
+        if connected and observed_inputs:
+            integrated = (
+                any(
+                    _endpoint_matches(endpoint, hardware_endpoint)
+                    for endpoint in observed_inputs
+                    for hardware_endpoint in hardware_endpoints
+                )
+                or None
+            )
         details.update(
             {
                 "installed": installed,
                 "running": running,
                 "state": state,
+                "connected": connected,
+                "integrated": integrated,
+                "observed_inputs": ", ".join(observed_inputs) or None,
+                "observed_outputs": ", ".join(observed_outputs) or None,
+                "capability_state": _capability_state(state, integrated),
+                "ros_graph_present": ros_graph_running,
+                "runtime_owner": (
+                    "ROS graph or direct process" if running else details.get("runtime_owner")
+                ),
                 "original_category": component.category,
             }
         )
@@ -1609,6 +1706,42 @@ def _software_inventory(
             )
         )
     return inventory
+
+
+def _matching_endpoints(endpoints: list[str], tokens: tuple[str, ...]) -> list[str]:
+    return sorted(
+        endpoint
+        for endpoint in endpoints
+        if any(token.casefold() in endpoint.casefold() for token in tokens)
+    )
+
+
+def _endpoint_matches(left: str, right: str) -> bool:
+    return left == right or left.endswith(right) or right.endswith(left)
+
+
+def _hardware_endpoints(devices: list[Component]) -> set[str]:
+    endpoints: set[str] = set()
+    for device in devices:
+        for key in ("ros_endpoint", "topics", "channel"):
+            value = device.details.get(key)
+            if value:
+                endpoints.update(item.strip() for item in str(value).split(",") if item.strip())
+    return endpoints
+
+
+def _capability_state(state: str, integrated: bool | None) -> str:
+    if state == "NOT_INSTALLED":
+        return "UNAVAILABLE"
+    if state in {"INSTALLED_INACTIVE", "CONFIGURED_INACTIVE"}:
+        return "INACTIVE"
+    if "MISSING_REQUIRED_INPUT" in state or "NO_EXPECTED_OUTPUT" in state:
+        return "BLOCKED"
+    if integrated is True:
+        return "OPERATIONAL_EVIDENCE_PRESENT"
+    if state == "RUNNING":
+        return "RUNNING_INTEGRATION_UNPROVEN"
+    return "NOT_EVALUATED"
 
 
 def _controller_components(output: str) -> list[Component]:
@@ -2060,7 +2193,14 @@ def _ros_installation_detected(components: list[Component]) -> bool:
 
 def _component_running(name: str, runtime_text: str) -> bool:
     hints = _RUNNING_HINTS.get(name, (name.lower().replace(" ", "_"),))
-    return any(hint.lower() in runtime_text for hint in hints)
+    return any(
+        re.search(
+            rf"(?<![a-z0-9]){re.escape(hint.casefold())}(?![a-z0-9])",
+            runtime_text.casefold(),
+        )
+        is not None
+        for hint in hints
+    )
 
 
 def _running_process_text() -> str:
@@ -2070,13 +2210,25 @@ def _running_process_text() -> str:
         for process in processes:
             try:
                 name = str(process.info.get("name") or "")
-                command = " ".join(str(value) for value in (process.info.get("cmdline") or []))
-                values.append(f"{name} {command}")
+                command = [str(value) for value in (process.info.get("cmdline") or [])]
+                values.extend(_process_identity_tokens(name, command))
             except (psutil.Error, OSError, TypeError):
                 continue
     except (psutil.Error, OSError):
         return ""
-    return " ".join(values).lower()
+    return "\n".join(values).casefold()
+
+
+def _process_identity_tokens(name: str, command: list[str]) -> list[str]:
+    """Keep executable identities while excluding arbitrary shell arguments."""
+
+    identities = {Path(name).name} if name else set()
+    if command:
+        identities.add(Path(command[0]).name)
+    for argument in command[1:3]:
+        if " " not in argument and Path(argument).suffix.casefold() in {".py", ".sh"}:
+            identities.add(Path(argument).name)
+    return sorted(identity for identity in identities if identity)
 
 
 def _usb_channel(device: USBDevice) -> str | None:

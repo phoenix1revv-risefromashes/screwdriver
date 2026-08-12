@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.metadata
 import importlib.util
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -17,20 +18,169 @@ from screwdriver.models import (
 
 _ROS_ROOT = Path("/opt/ros")
 
-_ROBOTICS_STACKS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("Navigation2", ("nav2_bringup", "nav2_controller")),
-    ("MoveIt", ("moveit_ros_move_group", "moveit_core")),
-    ("ros2_control", ("controller_manager", "hardware_interface")),
-    ("SLAM Toolbox", ("slam_toolbox",)),
-    ("RViz", ("rviz2", "rviz")),
-    ("Robot State Publisher", ("robot_state_publisher",)),
-    ("Gazebo ROS integration", ("ros_gz_bridge", "gazebo_ros")),
-    ("Camera drivers", ("usb_cam", "v4l2_camera", "realsense2_camera")),
+_ROBOTICS_STACKS: tuple[
+    tuple[str, str, str, tuple[str, ...], tuple[str, ...], tuple[str, ...]], ...
+] = (
+    (
+        "Navigation2",
+        "navigation and localization",
+        "autonomous navigation",
+        ("nav2_bringup", "nav2_controller", "nav2_planner", "nav2_bt_navigator"),
+        ("localization", "odometry", "TF", "sensor data"),
+        ("/cmd_vel", "navigation actions", "costmaps"),
+    ),
+    (
+        "AMCL",
+        "navigation and localization",
+        "localization",
+        ("nav2_amcl", "amcl"),
+        ("/scan", "/map", "TF", "odometry"),
+        ("pose estimate", "map-to-odom TF"),
+    ),
+    (
+        "Robot Localization",
+        "navigation and localization",
+        "state estimation",
+        ("robot_localization",),
+        ("odometry", "IMU", "GNSS"),
+        ("filtered odometry", "TF"),
+    ),
+    (
+        "SLAM Toolbox",
+        "SLAM and mapping",
+        "mapping",
+        ("slam_toolbox",),
+        ("/scan", "odometry", "TF"),
+        ("/map", "pose", "map-to-odom TF"),
+    ),
+    (
+        "Cartographer",
+        "SLAM and mapping",
+        "mapping",
+        ("cartographer_ros", "cartographer_ros_msgs"),
+        ("range data", "IMU", "odometry", "TF"),
+        ("submaps", "/map", "pose"),
+    ),
+    (
+        "RTAB-Map",
+        "SLAM and mapping",
+        "visual or RGB-D mapping",
+        ("rtabmap_ros", "rtabmap_slam", "rtabmap_odom"),
+        ("camera", "depth", "odometry", "TF"),
+        ("map", "pose", "point cloud"),
+    ),
+    (
+        "ros2_control",
+        "motion and control",
+        "motion control",
+        ("controller_manager", "hardware_interface", "joint_state_broadcaster"),
+        ("command interfaces", "hardware interfaces"),
+        ("joint state", "controller state"),
+    ),
+    (
+        "MoveIt",
+        "manipulation",
+        "motion planning and manipulation",
+        ("moveit_ros_move_group", "moveit_core", "moveit_ros_planning"),
+        ("robot description", "joint state", "planning request"),
+        ("trajectory", "planning scene"),
+    ),
+    (
+        "Camera drivers",
+        "perception and AI",
+        "visual perception",
+        ("usb_cam", "v4l2_camera", "realsense2_camera", "zed_wrapper"),
+        ("camera device",),
+        ("image", "camera info", "depth"),
+    ),
     (
         "LiDAR drivers",
+        "perception and AI",
+        "range perception",
         ("rplidar_ros", "rplidar_ros2", "urg_node", "velodyne_driver", "ouster_ros"),
+        ("LiDAR device",),
+        ("/scan", "point cloud"),
     ),
-    ("micro-ROS", ("micro_ros_agent", "micro_ros_setup")),
+    (
+        "Audio and speech",
+        "speech and interaction",
+        "speech interaction",
+        ("audio_common", "audio_capture", "audio_play", "tts", "speech_to_text"),
+        ("microphone", "audio stream"),
+        ("transcript", "speech audio"),
+    ),
+    (
+        "micro-ROS",
+        "MCU and embedded bridges",
+        "embedded controller integration",
+        ("micro_ros_agent", "micro_ros_setup"),
+        ("serial, UDP, or CAN transport",),
+        ("ROS entities",),
+    ),
+    (
+        "Gazebo ROS integration",
+        "simulation, sandbox, and visualization",
+        "simulation",
+        ("ros_gz_bridge", "ros_gz_sim", "gazebo_ros"),
+        ("simulation world", "robot description"),
+        ("virtual sensors", "simulated hardware"),
+    ),
+    (
+        "Isaac ROS",
+        "simulation, sandbox, and visualization",
+        "GPU-accelerated perception",
+        ("isaac_ros_common", "isaac_ros_nitros", "isaac_ros_visual_slam"),
+        ("camera or sensor data", "GPU runtime"),
+        ("accelerated ROS perception outputs",),
+    ),
+    (
+        "Webots ROS integration",
+        "simulation, sandbox, and visualization",
+        "simulation",
+        ("webots_ros2", "webots_ros2_driver"),
+        ("simulation world", "robot description"),
+        ("virtual sensors", "simulated hardware"),
+    ),
+    (
+        "RViz",
+        "simulation, sandbox, and visualization",
+        "visualization",
+        ("rviz2", "rviz"),
+        ("ROS graph data", "TF"),
+        ("operator visualization",),
+    ),
+    (
+        "Robot State Publisher",
+        "simulation, sandbox, and visualization",
+        "robot-state visualization",
+        ("robot_state_publisher",),
+        ("robot description", "joint states"),
+        ("TF",),
+    ),
+    (
+        "Teleoperation",
+        "teleoperation",
+        "teleoperation",
+        ("teleop_twist_keyboard", "teleop_twist_joy", "joy"),
+        ("keyboard, joystick, or remote command",),
+        ("/cmd_vel",),
+    ),
+    (
+        "Rosbag",
+        "recording, monitoring, and telemetry",
+        "recording and playback",
+        ("rosbag2", "rosbag2_transport"),
+        ("ROS topics",),
+        ("bag storage or replayed topics",),
+    ),
+    (
+        "Diagnostics",
+        "recording, monitoring, and telemetry",
+        "health monitoring",
+        ("diagnostic_aggregator", "diagnostic_updater"),
+        ("diagnostic status",),
+        ("aggregated diagnostics",),
+    ),
 )
 
 _TOOLS: tuple[tuple[str, str, str], ...] = (
@@ -41,7 +191,11 @@ _TOOLS: tuple[tuple[str, str, str], ...] = (
     ("vcstool", "vcs", "source-management tool"),
     ("RViz 2", "rviz2", "visualization tool"),
     ("Gazebo", "gz", "simulator"),
+    ("Webots", "webots", "simulator"),
+    ("Isaac Sim", "isaac-sim", "simulation sandbox"),
     ("Docker", "docker", "container runtime"),
+    ("Podman", "podman", "container runtime"),
+    ("Apptainer", "apptainer", "container runtime"),
 )
 
 _PYTHON_LIBRARIES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
@@ -90,6 +244,8 @@ def collect_robotics_software() -> tuple[list[Component], list[Finding]]:
     )
     invalid_prefix_paths = [path for path in prefix_paths if not Path(path).is_dir()]
     packages = _collect_package_names(inspection_prefixes, ros_version)
+    package_versions = _collect_package_versions(inspection_prefixes, packages)
+    package_configurations = _collect_package_configurations(inspection_prefixes, packages)
     active_prefix_distributions = _active_prefix_distributions(prefix_paths)
     workspaces = _workspace_paths(prefix_paths)
     rmw_implementation = _environment_value("RMW_IMPLEMENTATION")
@@ -139,7 +295,18 @@ def collect_robotics_software() -> tuple[list[Component], list[Finding]]:
     ]
 
     stack_components = [
-        _package_component(name, candidates, packages) for name, candidates in _ROBOTICS_STACKS
+        _package_component(
+            name,
+            category,
+            capability,
+            candidates,
+            inputs,
+            outputs,
+            packages,
+            package_versions,
+            package_configurations,
+        )
+        for name, category, capability, candidates, inputs, outputs in _ROBOTICS_STACKS
     ]
     tool_components = [
         _executable_component(name, executable, category) for name, executable, category in _TOOLS
@@ -457,6 +624,64 @@ def _collect_package_names(prefixes: list[str], ros_version: int | None) -> set[
     return packages
 
 
+def _collect_package_versions(prefixes: list[str], packages: set[str]) -> dict[str, str]:
+    """Read package.xml versions for only the stack packages Screwdriver recognizes."""
+
+    candidates = {
+        candidate
+        for _, _, _, stack_candidates, _, _ in _ROBOTICS_STACKS
+        for candidate in stack_candidates
+    }
+    versions: dict[str, str] = {}
+    for package in sorted(packages & candidates):
+        for prefix_text in prefixes:
+            manifest = Path(prefix_text) / "share" / package / "package.xml"
+            try:
+                content = manifest.read_text(encoding="utf-8", errors="replace")[:65536]
+            except OSError:
+                continue
+            match = re.search(r"<version(?:\s[^>]*)?>([^<]+)</version>", content)
+            if match:
+                versions[package] = match.group(1).strip()
+                break
+    return versions
+
+
+def _collect_package_configurations(
+    prefixes: list[str], packages: set[str]
+) -> dict[str, list[str]]:
+    """Find bounded launch/config evidence without reading or changing configuration."""
+
+    candidates = {
+        candidate
+        for _, _, _, stack_candidates, _, _ in _ROBOTICS_STACKS
+        for candidate in stack_candidates
+    }
+    configurations: dict[str, list[str]] = {}
+    for package in sorted(packages & candidates):
+        found: list[str] = []
+        for prefix_text in prefixes:
+            package_root = Path(prefix_text) / "share" / package
+            for directory_name in ("launch", "config", "params"):
+                directory = package_root / directory_name
+                try:
+                    paths = sorted(path for path in directory.rglob("*") if path.is_file())
+                except OSError:
+                    continue
+                for path in paths:
+                    if path.suffix.lower() in {".py", ".xml", ".yaml", ".yml", ".json"}:
+                        found.append(str(path))
+                    if len(found) >= 12:
+                        break
+                if len(found) >= 12:
+                    break
+            if len(found) >= 12:
+                break
+        if found:
+            configurations[package] = found
+    return configurations
+
+
 def _active_prefix_distributions(prefix_paths: list[str]) -> list[str]:
     distributions: set[str] = set()
     for value in prefix_paths:
@@ -486,14 +711,44 @@ def _workspace_paths(prefix_paths: list[str]) -> list[str]:
     return workspaces
 
 
-def _package_component(name: str, candidates: tuple[str, ...], packages: set[str]) -> Component:
+def _package_component(
+    name: str,
+    stack_category: str,
+    capability: str,
+    candidates: tuple[str, ...],
+    required_inputs: tuple[str, ...],
+    expected_outputs: tuple[str, ...],
+    packages: set[str],
+    package_versions: dict[str, str],
+    package_configurations: dict[str, list[str]],
+) -> Component:
     matches = sorted(set(candidates) & packages)
+    versions = [
+        f"{package} {package_versions[package]}"
+        for package in matches
+        if package in package_versions
+    ]
+    configuration_sources = [
+        path for package in matches for path in package_configurations.get(package, [])
+    ]
     return Component(
-        category="robotics stack",
+        category="robotics software stack",
         name=name,
         status=ComponentStatus.OK if matches else ComponentStatus.UNKNOWN,
         details={
             "installed": bool(matches),
+            "configured": True if configuration_sources else None,
+            "running": False,
+            "connected": None,
+            "integrated": None,
+            "state": "INSTALLED_NOT_EVALUATED" if matches else "NOT_INSTALLED",
+            "stack_category": stack_category,
+            "capability": capability,
+            "required_inputs": ", ".join(required_inputs),
+            "expected_outputs": ", ".join(expected_outputs),
+            "runtime_owner": None,
+            "version": ", ".join(versions) or None,
+            "configuration_source": ", ".join(configuration_sources) or None,
             "detected_packages": ", ".join(matches) or None,
             "package_candidates": ", ".join(candidates),
             "optional": True,

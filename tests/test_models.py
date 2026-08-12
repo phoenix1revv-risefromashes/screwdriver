@@ -132,7 +132,7 @@ def test_snapshot_serializes_all_runtime_inventories() -> None:
     snapshot = collect_host()
     payload = snapshot.to_dict()
 
-    assert payload["schema_version"] == "3.1"
+    assert payload["schema_version"] == "3.2"
     assert "software_stack_inventory" in payload
     assert "sensor_inventory" in payload
     assert "actuator_inventory" in payload

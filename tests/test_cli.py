@@ -356,7 +356,7 @@ def test_inspect_defaults_to_local_and_writes_all_reports(
     assert "Serial device 1: Silicon Labs CP2102N USB to UART Bridge" in output
     assert "Port:             /dev/ttyUSB0" in output
     assert "Stable by-id:     /dev/serial/by-id/usb-Silicon_Labs" in output
-    assert "SOFTWARE STACK INVENTORY" in output
+    assert "ROBOTICS SOFTWARE STACKS" in output
     assert "Navigation2" in output
     assert "CURRENT DEVICES IN USE BY ROS 2" in output
     assert "1. Camera" in output
@@ -382,7 +382,7 @@ def test_inspect_defaults_to_local_and_writes_all_reports(
     assert "crw-rw----" not in output
     assert "analyze" not in output
 
-    local_runs = list((tmp_path / "local").iterdir())
+    local_runs = [path for path in (tmp_path / "local").iterdir() if path.name != "latest"]
     assert len(local_runs) == 1
     run = local_runs[0]
     assert (run / "snapshot.json").is_file()
@@ -390,6 +390,7 @@ def test_inspect_defaults_to_local_and_writes_all_reports(
     assert (run / "report.html").is_file()
     assert (run / "inspection.log").is_file()
     assert (run / "report-manifest.json").is_file()
+    assert (tmp_path / "local" / "latest").resolve() == run.resolve()
 
     snapshot_json = (run / "snapshot.json").read_text(encoding="utf-8")
     html_report = (run / "report.html").read_text(encoding="utf-8")
@@ -419,6 +420,8 @@ def test_inspect_defaults_to_local_and_writes_all_reports(
     assert "ROS 2 actuators / output devices" in html_report
     assert "/camera/image_raw" in html_report
     assert '"report_timezone": "America/Los_Angeles"' in snapshot_json
+    assert "Snapshot SHA-256:" in text_report
+    assert "Screwdriver:      0.2.1" in text_report
     assert '"created_at": "2026-08-10T05:00:00-07:00"' in snapshot_json
     assert "software_stacks=1" in (run / "inspection.log").read_text(encoding="utf-8")
     assert "ros_devices=4" in (run / "inspection.log").read_text(encoding="utf-8")
@@ -453,8 +456,8 @@ def test_agentic_mode_separates_local_and_agentic_report_sets(
     assert "Compact snapshot:" in output
     assert "Diagnostic report:" in output
     assert "Problems reported:" in output
-    local_runs = list((tmp_path / "local").iterdir())
-    agentic_runs = list((tmp_path / "agentic").iterdir())
+    local_runs = [path for path in (tmp_path / "local").iterdir() if path.name != "latest"]
+    agentic_runs = [path for path in (tmp_path / "agentic").iterdir() if path.name != "latest"]
     assert len(local_runs) == len(agentic_runs) == 1
     assert local_runs[0].name == agentic_runs[0].name
     assert (local_runs[0] / "snapshot.json").is_file()
@@ -463,6 +466,8 @@ def test_agentic_mode_separates_local_and_agentic_report_sets(
     assert (agentic_runs[0] / "diagnostic-report.html").is_file()
     assert (agentic_runs[0] / "agent-analysis.json").is_file()
     assert (agentic_runs[0] / "report-manifest.json").is_file()
+    assert (tmp_path / "local" / "latest").resolve() == local_runs[0].resolve()
+    assert (tmp_path / "agentic" / "latest").resolve() == agentic_runs[0].resolve()
 
 
 def test_repeated_inspections_never_overwrite_timestamped_runs(tmp_path: Path) -> None:
@@ -471,9 +476,17 @@ def test_repeated_inspections_never_overwrite_timestamped_runs(tmp_path: Path) -
         assert main(["inspect", "--output", str(tmp_path)]) == 0
         assert main(["inspect", "--output", str(tmp_path)]) == 0
 
-    runs = sorted(path.name for path in (tmp_path / "local").iterdir())
-    assert runs == ["2026-08-10_05-00-00", "2026-08-10_05-00-00_01"]
+    runs = sorted(path.name for path in (tmp_path / "local").iterdir() if path.name != "latest")
+    assert runs == ["2026-08-10_05:00:00", "2026-08-10_05:00:00_01"]
     assert all((tmp_path / "local" / run / "snapshot.json").is_file() for run in runs)
+    assert (tmp_path / "local" / "latest").resolve().name == "2026-08-10_05:00:00_01"
+
+
+def test_default_report_root_is_plural_reports() -> None:
+    parser = build_parser()
+
+    assert parser.parse_args(["inspect"]).output == Path("reports")
+    assert parser.parse_args(["analyze", "snapshot.json"]).output == Path("reports")
 
 
 def test_agentic_cli_accepts_anthropic_and_openai_provider_model_pairs() -> None:
@@ -588,8 +601,9 @@ def test_analyze_existing_snapshot_generates_timestamped_agentic_reports(
     output = capsys.readouterr().out
     assert "SCREWDRIVER AGENTIC ANALYSIS" in output
     assert "Repairs executed:  no" in output
-    runs = list((output_path / "agentic").iterdir())
+    runs = [path for path in (output_path / "agentic").iterdir() if path.name != "latest"]
     assert len(runs) == 1
+    assert (output_path / "agentic" / "latest").resolve() == runs[0].resolve()
     assert (runs[0] / "compact_snapshot.html").is_file()
     assert (runs[0] / "system-blueprint.html").is_file()
     assert (runs[0] / "diagnostic-report.html").is_file()

@@ -13,6 +13,7 @@ from unittest.mock import patch
 from screwdriver.agentic import (
     ProbeRequest,
     _deterministic_issues,
+    _evidence_view,
     _merge_agent_issues,
     _probe_command,
     _safe_recommended_commands,
@@ -50,7 +51,23 @@ def _snapshot() -> dict[str, object]:
             }
         ],
         "serial_devices": [],
-        "software_stack_inventory": [],
+        "software_stack_inventory": [
+            {
+                "category": "robotics software stack",
+                "name": "Navigation2",
+                "status": "ok",
+                "details": {
+                    "stack_category": "navigation and localization",
+                    "installed": True,
+                    "configured": True,
+                    "running": True,
+                    "integrated": None,
+                    "capability": "autonomous navigation",
+                    "state": "RUNNING",
+                    "detected_packages": "nav2_bringup, nav2_controller",
+                },
+            }
+        ],
         "sensor_inventory": [],
         "actuator_inventory": [],
         "ros_device_inventory": [
@@ -129,6 +146,12 @@ def test_deterministic_analysis_writes_compact_and_detailed_report_contract(
     assert "Component health and ownership matrix" in blueprint
     assert "Camera" in blueprint
     assert "Active data and command flow" in blueprint
+    assert "Robotics software-stack architecture" in blueprint
+    assert 'id="stack-navigation2"' in blueprint
+    assert "Robotics software stacks" in compact
+    assert "2026-08-10 05:00:00 PDT" in compact
+    assert "system-blueprint.html#stack-navigation2" in compact
+    assert "Robotics-stack operational stages" in diagnostics
     assert "Collection coverage" in compact
     assert "What is working in this snapshot" in compact
     assert "Degraded behavior" in diagnostics
@@ -147,6 +170,7 @@ def test_deterministic_analysis_writes_compact_and_detailed_report_contract(
     assert 'id="hardware"' in blueprint
     assert 'id="software"' in blueprint
     assert analysis["repairs_executed"] is False
+    assert analysis["screwdriver_version"] == "0.2.1"
     assert analysis["snapshot_sha256"]
     assert analysis["successful_checks"]
     assert analysis["issues"][0]["code"] == "MEMORY_HIGH_USAGE"
@@ -181,6 +205,36 @@ def test_agent_recommended_state_changes_are_removed() -> None:
     )
 
     assert commands == ["ros2 node list"]
+
+
+def test_provider_evidence_is_redacted_deduplicated_and_discloses_truncation() -> None:
+    snapshot = _snapshot()
+    duplicate = {
+        "category": "robotics software stack",
+        "name": "Navigation2",
+        "details": {"serial_number": "private-serial", "note": "x" * 1300},
+    }
+    snapshot["software_stack_inventory"] = [duplicate, duplicate.copy()]
+    snapshot["findings"].append(
+        {
+            "code": "SERIAL_NOTE",
+            "severity": "info",
+            "summary": "Device /dev/serial/by-id/private-unit at aa:bb:cc:dd:ee:ff",
+        }
+    )
+
+    evidence = _evidence_view(snapshot)
+    stacks = evidence["software_stack_inventory"]
+    metadata = evidence["evidence_package_metadata"]
+
+    assert len(stacks) == 1
+    assert stacks[0]["details"]["serial_number"] == "[redacted]"
+    assert len(stacks[0]["details"]["note"]) == 1200
+    assert "[redacted]" in str(evidence["findings"])
+    assert "[redacted-mac]" in str(evidence["findings"])
+    omissions = metadata["omitted_or_truncated_paths"]
+    assert any("duplicate records removed" in item for item in omissions)
+    assert any("string truncated" in item for item in omissions)
 
 
 def test_new_model_issue_requires_a_real_snapshot_evidence_reference() -> None:
@@ -263,7 +317,7 @@ def test_agentic_html_humanizes_bytes_uptime_and_container_values(tmp_path: Path
     assert "19 min 37 sec" in blueprint
     assert "465.8 GiB" in blueprint
     assert "<td>500107862016</td>" not in blueprint
-    assert '[&quot;uvcvideo&quot;]' not in blueprint
+    assert "[&quot;uvcvideo&quot;]" not in blueprint
 
 
 class _FakeAnthropicResponse:
@@ -352,9 +406,9 @@ def test_anthropic_retries_transient_failure_and_records_request_metadata(
         assert timeout == 120
         attempts += 1
         if attempts == 1:
-            error_body = json.dumps(
-                {"error": {"message": "temporarily unavailable"}}
-            ).encode("utf-8")
+            error_body = json.dumps({"error": {"message": "temporarily unavailable"}}).encode(
+                "utf-8"
+            )
             raise urllib.error.HTTPError(
                 request.full_url,
                 503,
