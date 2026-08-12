@@ -141,23 +141,74 @@ def test_deterministic_analysis_writes_compact_and_detailed_report_contract(
     compact = result.paths.compact.read_text(encoding="utf-8")
     analysis = json.loads(result.paths.analysis.read_text(encoding="utf-8"))
 
-    assert "Complete Robotic System Blueprint" not in blueprint
+    assert "COMPLETE ROBOT SYSTEM BLUEPRINT" in blueprint
     assert "System blueprint — test-robot" in blueprint
-    assert "Component health and ownership matrix" in blueprint
+    assert "COMPLETE SYSTEM SUMMARY" in blueprint
     assert "Camera" in blueprint
-    assert "Active data and command flow" in blueprint
-    assert "Robotics software-stack architecture" in blueprint
+    assert "Publisher → topic → subscriber relationships" in blueprint
+    assert "ROS-to-hardware ownership" in blueprint
+    assert "ROBOTICS SOFTWARE STACKS" in blueprint
+    assert "Complete robotics stack status matrix" in blueprint
+    for stack in (
+        "Navigation2",
+        "AMCL",
+        "Robot Localization",
+        "SLAM Toolbox",
+        "Cartographer",
+        "RTAB-Map",
+        "ros2_control",
+        "MoveIt",
+        "Teleoperation",
+        "Rosbag",
+        "Diagnostics",
+    ):
+        assert stack in blueprint
+    assert "NOT RECORDED IN SNAPSHOT" in blueprint
     assert 'id="stack-navigation2"' in blueprint
-    assert "Robotics software stacks" in compact
+    blueprint_sections = (
+        "summary",
+        "platform",
+        "storage",
+        "buses",
+        "devices",
+        "linux",
+        "network",
+        "execution",
+        "ros-environment",
+        "ros-graph",
+        "software",
+        "capabilities",
+        "interpretation",
+        "coverage",
+    )
+    assert [blueprint.index(f'id="{name}"') for name in blueprint_sections] == sorted(
+        blueprint.index(f'id="{name}"') for name in blueprint_sections
+    )
+    assert "QUICK SYSTEM SNAPSHOT" in compact
+    for layer in (
+        "Compute",
+        "Physical hardware",
+        "Linux integration",
+        "ROS 2",
+        "Robot capabilities",
+    ):
+        assert layer in compact
     assert "2026-08-10 05:00:00 PDT" in compact
-    assert "system-blueprint.html#stack-navigation2" in compact
-    assert "Robotics-stack operational stages" in diagnostics
-    assert "Collection coverage" in compact
-    assert "What is working in this snapshot" in compact
+    assert "Problems that can affect operation" in compact
+    assert "Evidence boundary" not in compact
+    assert "Complete USB topology" not in compact
+    assert "ANALYSIS" in compact
+    assert "deterministic analysis" in compact.split("</header>", 1)[0]
+    assert "Installed</th><th>Configured" not in compact
+    assert "COMPLETE ENGINEERING DIAGNOSTICS" in diagnostics
     assert "Degraded behavior" in diagnostics
     assert "Physical memory usage is above 90%." in diagnostics
-    assert "Ordered approach" in diagnostics
-    assert "Success criteria" in diagnostics
+    assert "Diagnostic commands" in diagnostics
+    assert "Step-by-step solution" in diagnostics
+    assert "Measurable success criteria" in diagnostics
+    assert "Rollback plan" in diagnostics
+    assert "CROSS-SYSTEM INCONSISTENCIES" in diagnostics
+    assert "FINAL VERIFICATION" in diagnostics
     for section_id in (
         "confirmed_failure",
         "degraded",
@@ -167,7 +218,7 @@ def test_deterministic_analysis_writes_compact_and_detailed_report_contract(
         "probes",
     ):
         assert f'id="{section_id}"' in diagnostics
-    assert 'id="hardware"' in blueprint
+    assert 'id="platform"' in blueprint
     assert 'id="software"' in blueprint
     assert analysis["repairs_executed"] is False
     assert analysis["screwdriver_version"] == "0.2.1"
@@ -318,6 +369,58 @@ def test_agentic_html_humanizes_bytes_uptime_and_container_values(tmp_path: Path
     assert "465.8 GiB" in blueprint
     assert "<td>500107862016</td>" not in blueprint
     assert "[&quot;uvcvideo&quot;]" not in blueprint
+
+
+def test_redesigned_reports_preserve_device_access_and_lead_with_findings(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot()
+    snapshot["serial_devices"] = [
+        {
+            "display_name": "CP2102N USB-UART",
+            "port": "/dev/ttyUSB0",
+            "transport": "usb-serial",
+            "driver": "cp210x",
+            "stable_id_path": "/dev/serial/by-id/usb-cp2102n-test",
+            "physical_path": "/dev/serial/by-path/platform-usb-test",
+            "device_node": {
+                "path": "/dev/ttyUSB0",
+                "permissions": "crw-rw----",
+                "owner": "root",
+                "group": "dialout",
+                "access": "denied",
+            },
+        }
+    ]
+    snapshot["sensor_inventory"] = [
+        {
+            "category": "sensor",
+            "name": "USB microphone array",
+            "details": {
+                "kind": "microphone",
+                "bus": "USB",
+                "driver": "snd-usb-audio",
+                "channel": "/dev/snd/by-id/usb-microphone-test, /dev/snd/pcmC2D0c",
+                "health": "PRESENT_NOT_EXERCISED",
+                "confidence": "VERIFIED",
+            },
+        }
+    ]
+    snapshot_path = tmp_path / "snapshot.json"
+    snapshot_path.write_text(json.dumps(snapshot), encoding="utf-8")
+
+    result = analyze_snapshot_file(snapshot_path, tmp_path / "agentic", provider="none")
+    compact = result.paths.compact.read_text(encoding="utf-8")
+    blueprint = result.paths.blueprint.read_text(encoding="utf-8")
+    diagnostics = result.paths.diagnostics.read_text(encoding="utf-8")
+
+    assert "/dev/serial/by-id/usb-cp2102n-test" in blueprint
+    assert "crw-rw---- · root:dialout · denied" in blueprint
+    assert "snd-usb-audio" in blueprint
+    assert "PRESENT_NOT_EXERCISED" in blueprint
+    assert "Physical hardware" in compact
+    assert diagnostics.index('id="overview"') < diagnostics.index('id="degraded"')
+    assert "Operational consequence" in diagnostics
 
 
 class _FakeAnthropicResponse:

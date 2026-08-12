@@ -395,6 +395,19 @@ def _deterministic_summary(snapshot: dict[str, Any]) -> str:
     platform = _mapping(snapshot.get("platform"))
     ros = _ros_overview(snapshot)
     devices = _current_ros_device_names(snapshot)
+    network = _mapping(snapshot.get("network"))
+    physical = [
+        str(item.get("display_name"))
+        for item in _records(snapshot.get("usb_devices"))
+        if item.get("display_name")
+        and str(item.get("device_class_name") or "").lower() != "hub"
+        and "host controller" not in str(item.get("display_name")).lower()
+    ]
+    installed = [
+        str(item.get("name"))
+        for item in _records(snapshot.get("software_stack_inventory"))
+        if _mapping(item.get("details")).get("installed")
+    ]
     machine = platform.get("product_name") or platform.get("board_name") or "Linux computer"
     graph = ""
     if ros:
@@ -403,14 +416,37 @@ def _deterministic_summary(snapshot: dict[str, Any]) -> str:
             f"{ros.get('topics', 0)} topics."
         )
     device_text = f" ROS currently uses {', '.join(devices)}." if devices else ""
+    network_text = (
+        f" Its default network path is {network.get('default_interface')}"
+        + (f" through {network.get('default_gateway')}" if network.get("default_gateway") else "")
+        + "."
+        if network.get("default_interface")
+        else " No default network path was established."
+    )
+    physical_text = (
+        f" Robot-facing USB evidence includes {', '.join(physical[:6])}." if physical else ""
+    )
+    software_text = (
+        f" Installed robotics/platform software includes {', '.join(installed[:8])}."
+        if installed
+        else ""
+    )
     return (
         f"{identity.get('hostname', 'This robotic computer')} is a {machine} running "
-        f"{os_info.get('distribution', 'Linux')}.{graph}{device_text}"
+        f"{os_info.get('distribution', 'Linux')}.{network_text}{graph}{device_text}"
+        f"{physical_text}{software_text} Presence is reported separately from configuration, "
+        "runtime participation, integration, and functional verification."
     )
 
 
 def _architecture_observations(snapshot: dict[str, Any]) -> list[str]:
     observations: list[str] = []
+    network = _mapping(snapshot.get("network"))
+    if network.get("default_interface"):
+        observations.append(
+            f"The host network path uses {network.get('default_interface')} as the default interface"
+            + (f" via {network.get('default_gateway')}." if network.get("default_gateway") else ".")
+        )
     ros = _ros_overview(snapshot)
     if ros:
         observations.append(
@@ -427,6 +463,22 @@ def _architecture_observations(snapshot: dict[str, Any]) -> list[str]:
         chain = " → ".join(str(value) for value in (physical, node, channel) if value)
         if chain:
             observations.append(f"{kind}: {chain}")
+    for sensor in _records(snapshot.get("sensor_inventory"))[:8]:
+        details = _mapping(sensor.get("details"))
+        observations.append(
+            f"{sensor.get('name', 'Sensor')}: detected through {details.get('bus') or 'an unspecified bus'} "
+            f"with {details.get('driver') or 'no reported driver'}; observed state "
+            f"{details.get('health') or details.get('state') or 'unknown'}, and no physical function is inferred."
+        )
+    running_stacks = [
+        str(item.get("name"))
+        for item in _records(snapshot.get("software_stack_inventory"))
+        if _mapping(item.get("details")).get("running")
+    ]
+    if running_stacks:
+        observations.append(
+            f"Runtime evidence was collected for {', '.join(running_stacks)}; this does not by itself prove an end-to-end robot capability."
+        )
     return observations
 
 
@@ -439,10 +491,30 @@ def _unknowns(snapshot: dict[str, Any]) -> list[str]:
                 f"{details.get('kind') or device.get('name')}: physical hardware is not proven."
             )
     for device in _records(snapshot.get("serial_devices")):
-        if not device.get("stable_id_path"):
+        transport = str(device.get("transport") or "")
+        if not transport.startswith("onboard") and not device.get("stable_id_path"):
             unknowns.append(
                 f"{device.get('port', 'Serial device')}: no stable by-id identity was found."
             )
+    sensors = _records(snapshot.get("sensor_inventory"))
+    actuators = _records(snapshot.get("actuator_inventory"))
+    ros_devices = _records(snapshot.get("ros_device_inventory"))
+    if sensors and not ros_devices:
+        unknowns.append(
+            "Detected physical sensors are not mapped to ROS nodes, topics, or application owners."
+        )
+    if not actuators:
+        unknowns.append(
+            "No actuator inventory was collected, so motion and command-path readiness cannot be assessed."
+        )
+    ros = _ros_overview(snapshot)
+    if ros and int(ros.get("nodes") or 0) == 0:
+        unknowns.append(
+            "No ROS node detail was captured; topic and service names cannot be assigned to active process owners."
+        )
+    unknowns.append(
+        "The snapshot does not declare the robot mission profile or required components, so optional absence is not treated as failure."
+    )
     return _deduplicate_text(unknowns)
 
 
@@ -607,15 +679,25 @@ def _provider_analysis(
         "read_only_probe_results": [probe.to_dict() for probe in probe_results or []],
     }
     system = (
-        "You are Screwdriver's robotics diagnostic engineer. Use only supplied evidence. "
+        "You are Screwdriver's senior robotics systems and bring-up engineer. Use only supplied evidence. "
         "Never claim hardware was tested, never invent facts, and distinguish verified, "
         "correlated, inferred, and unknown information. Do not turn an absent, down, unused, "
         "or unreferenced component into a fault unless an expected state proves it is required. "
         "A ROS publisher/subscriber relationship proves graph participation, not ownership of "
         "physical hardware. Deterministic issues are baseline evidence, but you may classify "
         "conditional observations as advisories or operator-confirmation items. "
-        "For each problem, provide ordered troubleshooting approaches and measurable success "
-        "criteria and exact snapshot evidence references. Separate confidence in the observation "
+        "Preserve the technical detail of the deterministic snapshot instead of replacing it with "
+        "a generic summary. Build a coherent cross-layer interpretation in this order: compute and "
+        "OS, physical buses and devices, kernel drivers and device nodes, processes or containers, "
+        "ROS nodes and endpoints, then robot capabilities. Architecture observations must explain "
+        "the relationship, its operational meaning, and the evidence limitation; do not merely list "
+        "components. Explicitly assess relevant ROS, navigation, localization, SLAM, control, sensor, "
+        "audio, simulation, telemetry, container and GPU evidence when present. For each problem, "
+        "provide exact snapshot evidence references, expected versus observed state, operational "
+        "impact, probable causes, read-only diagnostic commands, an ordered correction sequence, "
+        "measurable success criteria, and rollback guidance. The correction sequence must preserve "
+        "the current configuration, change only the smallest affected scope, reload only that scope, "
+        "retest the original symptom, and finish with a new passive scan. Separate confidence in the observation "
         "from confidence in the diagnosis. You may request only the listed read-only probes. "
         "Never recommend that the "
         "software execute repairs, actuator commands, permission changes, installs, restarts, "
@@ -624,8 +706,11 @@ def _provider_analysis(
     if probe_results:
         system += " Probe results are final evidence; do not request additional probes."
     user = (
-        "Build (1) a concise system-blueprint narrative and (2) an evidence-grounded "
-        "diagnostic plan. Allowed probes: ros_node_info, ros_topic_info, ros_param_list, "
+        "Build (1) a concise but information-dense engineering summary, (2) ordered cross-layer "
+        "architecture observations, (3) explicit evidence gaps, and (4) an evidence-grounded "
+        "problem-centered diagnostic plan. State what exists, how it is connected, its observed operational stage, "
+        "what that means for the robot, and what cannot be concluded. Allowed probes: "
+        "ros_node_info, ros_topic_info, ros_param_list, "
         "device_metadata, port_owner, service_status, recent_kernel_logs, network_link.\n\n"
         + json.dumps(evidence, separators=(",", ":"))
     )
