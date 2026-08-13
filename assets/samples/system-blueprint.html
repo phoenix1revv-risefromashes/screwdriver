@@ -1,0 +1,1936 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>System blueprint — cutie</title><style>
+:root{--bg:#07101c;--panel:#0e1a2a;--panel2:#13243a;--line:#29415e;--text:#eef6ff;--muted:#a9bdd2;--cyan:#62d6ff;--green:#53dda2;--amber:#ffc85c;--orange:#ff9f5a;--red:#ff6476;--shadow:0 18px 50px #0005}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:linear-gradient(145deg,#07101c,#0a1727 48%,#07101c);color:var(--text);font:15px/1.55 Inter,ui-sans-serif,system-ui,sans-serif}main{max-width:1240px;margin:auto;padding:34px 22px 80px}h1{font-size:clamp(2rem,5vw,4rem);line-height:1.05;margin:.25rem 0 1rem}h2{font-size:1.55rem;margin:0 0 1rem}h3{margin:.6rem 0}h4{margin:1.2rem 0 .45rem}p{margin:.45rem 0 1rem}a{color:var(--cyan)}section,.hero,.toc{background:#0e1a2aee;border:1px solid var(--line);border-radius:18px;padding:24px;margin:18px 0;box-shadow:var(--shadow)}.hero{padding:36px;background:linear-gradient(135deg,#102a43,#0e1a2a)}.hero.tone-critical,.hero.tone-high{background:linear-gradient(135deg,#4a1d2c,#0e1a2a)}.hero.tone-warning{background:linear-gradient(135deg,#45341b,#0e1a2a)}.hero.tone-ok{background:linear-gradient(135deg,#123a32,#0e1a2a)}.lede{max-width:920px;color:#dbe9f7;font-size:1.05rem}.eyebrow{margin:0;letter-spacing:.16em;font-size:.72rem;font-weight:800;color:var(--cyan)}.meta{display:flex;gap:8px;flex-wrap:wrap}.meta span,.pill,.evidence-ref{border:1px solid #426383;border-radius:999px;padding:4px 9px;font-size:.74rem;text-decoration:none}.toc{position:sticky;top:8px;z-index:3;display:flex;gap:14px;flex-wrap:wrap;padding:11px 18px}.toc a{text-decoration:none;font-weight:700}.metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px}.metric{background:var(--panel2);border:1px solid var(--line);border-radius:13px;padding:15px}.metric strong{display:block;font-size:1.22rem;color:var(--cyan);overflow-wrap:anywhere}.metric.tone-ok strong{color:var(--green)}.metric.tone-warning strong{color:var(--amber)}.metric.tone-high strong,.metric.tone-critical strong{color:var(--red)}.two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px}.three-col{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.section-head{display:flex;justify-content:space-between;gap:16px;align-items:center}.priority,.callout,.status-line{border-left:5px solid var(--amber);background:#262219;padding:17px 19px;border-radius:12px}.status-line{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.finding{border:1px solid var(--line);border-left:6px solid var(--amber);border-radius:13px;padding:16px;margin:12px 0;background:#0b1625}.severity-critical,.severity-high{border-left-color:var(--red)}.severity-low,.severity-info{border-left-color:var(--cyan)}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:12px}.card{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px}.card.ok{border-left:4px solid var(--green)}.empty{border:1px dashed #52708f;border-radius:13px;padding:20px}.muted,small{color:var(--muted)}.table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}table{width:100%;border-collapse:collapse;min-width:650px;background:#0b1625}th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;max-width:460px;overflow-wrap:anywhere}th{position:sticky;top:0;background:#172b43;color:#dcecff}tr:last-child td{border-bottom:0}.state{font-weight:800}.state-collected{color:var(--green)}.state-partial{color:var(--amber)}.state-not-available{color:var(--red)}details{border:1px solid var(--line);border-radius:12px;margin:11px 0;background:#0b1625}summary{cursor:pointer;padding:14px;font-weight:700}.issue summary{display:flex;gap:12px;align-items:flex-start}.issue summary small{display:block;font-weight:500}.issue-body{padding:0 18px 18px}.issue-number{display:grid;place-items:center;min-width:30px;height:30px;border-radius:50%;background:#203754}pre{white-space:pre-wrap;word-break:break-word;background:#050c15;border:1px solid #20364f;border-radius:9px;padding:12px;max-height:520px;overflow:auto}code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.count{font-size:.8rem;color:var(--muted)}.metadata{background:#0a1421}@media(max-width:800px){.two-col,.three-col{grid-template-columns:1fr}.toc{position:static}.section-head{align-items:flex-start;flex-direction:column}section,.hero{padding:18px}}@media print{:root{--text:#111;--muted:#555;--line:#bbb}body{background:white;color:#111;font-size:10pt}main{max-width:none;padding:0}section,.hero,.toc,details{background:white!important;box-shadow:none;border-color:#bbb;break-inside:avoid}.toc{display:none}.hero{color:#111}.metric,.card,.finding,table,pre{background:white!important;color:#111}details{break-inside:auto}details>summary{list-style:none}details>.issue-body,details>pre{display:block}a{color:#111;text-decoration:none}}
+.provenance-strip{display:grid;grid-template-columns:2fr 1.25fr 1fr 1fr;gap:10px;margin-top:22px}.provenance-strip span{display:flex;flex-direction:column;gap:3px;border-top:1px solid #426383;padding-top:9px;min-width:0}.provenance-strip small{font-size:.65rem;letter-spacing:.12em}.provenance-strip strong{font-size:.78rem;overflow-wrap:anywhere}.section-intro{max-width:900px;color:var(--muted)}.capability-grid,.stack-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.capability,.stack-card,.chain{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:17px}.capability{border-left:5px solid #52708f}.capability.tone-ok{border-left-color:var(--green)}.capability.tone-partial,.capability.tone-warning{border-left-color:var(--amber)}.capability.tone-muted{opacity:.76}.capability-head,.stack-title,.chain-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.capability-head h3,.stack-title h3,.chain-head h3{margin:0}.capability-head .state,.stage,.chain-head span{border:1px solid #426383;border-radius:999px;padding:4px 9px;font-size:.7rem;font-weight:800;white-space:nowrap}.evidence-line{color:var(--cyan);font-size:.84rem}.chain{margin:12px 0}.chain-path{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto minmax(0,1fr);gap:10px;align-items:center}.chain-path div{background:#091524;border:1px solid var(--line);border-radius:10px;padding:11px;min-height:80px}.chain-path small{display:block;font-size:.63rem;letter-spacing:.1em;margin-bottom:5px}.chain-path strong{display:block;overflow-wrap:anywhere}.chain-path b{color:var(--cyan)}.state-line{margin:10px 0 0;color:var(--muted)}.stack-card{margin:0}.stage-ladder{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin:14px 0}.stage-step{border:1px solid var(--line);border-radius:9px;padding:8px;min-width:0}.stage-step small,.stage-step strong{display:block;overflow-wrap:anywhere}.stage-step.yes{border-color:#287a5d}.stage-step.no{border-color:#684b4b}.stage-step.unknown{opacity:.68}.absent-stacks{margin-top:16px}.absent-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:0 14px 14px}.absent-group{border-left:3px solid #52708f;padding-left:12px}.impact{border-left:4px solid var(--amber);padding:1px 15px;margin:14px 0;background:#201e1d}h5{margin:1rem 0 .3rem}.compact-provenance{font-size:.82rem}.title-row{display:flex;justify-content:space-between;gap:20px;align-items:flex-end}.report-links{display:flex;gap:8px;flex-wrap:wrap}.report-links a{border:1px solid #426383;border-radius:999px;padding:6px 11px;text-decoration:none;font-size:.78rem}.quick-stack,.quick-attention{padding:20px}.layer-stack{display:flex;flex-direction:column}.system-layer{display:grid;grid-template-columns:42px 1fr;gap:13px;padding:13px 0;border-bottom:1px solid var(--line)}.system-layer:last-child{border-bottom:0}.layer-number{display:grid;place-items:center;width:34px;height:34px;border:1px solid #426383;border-radius:50%;color:var(--cyan);font-weight:800}.layer-title{display:flex;justify-content:space-between;gap:12px;align-items:center}.layer-title h3{margin:0}.layer-state{font-size:.68rem;font-weight:800;letter-spacing:.08em;border:1px solid #426383;border-radius:999px;padding:3px 8px}.layer-copy p{margin:.25rem 0}.layer-copy small{display:block}.issue-scope{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:15px 0}.issue-scope span{border:1px solid var(--line);border-radius:10px;padding:10px}.issue-scope small,.issue-scope strong{display:block}.command-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.command-card{border:1px solid var(--line);border-radius:12px;padding:12px}.command-card pre{margin:.45rem 0}.safe-label{font-size:.65rem;font-weight:800;color:var(--green);letter-spacing:.1em}@media(max-width:850px){.provenance-strip,.capability-grid,.stack-grid,.absent-grid,.issue-scope,.command-grid{grid-template-columns:1fr}.title-row{align-items:flex-start;flex-direction:column}.chain-path{grid-template-columns:1fr}.chain-path b{transform:rotate(90deg);text-align:center}.stage-ladder{grid-template-columns:repeat(2,1fr)}}@media print{@page{size:auto;margin:13mm 11mm}body{font-size:9pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}section,.hero,details{break-inside:auto}h1,h2,h3,h4,.section-head,.capability-head,.stack-title{break-after:avoid}.capability,.stack-card,.finding,.chain,.metric,.priority,.status-line,.system-layer,.command-card{break-inside:avoid}.provenance-strip{grid-template-columns:2fr 1.2fr 1fr 1fr}.capability-grid,.stack-grid,.command-grid{grid-template-columns:1fr 1fr}.chain-path{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto minmax(0,1fr)}table{min-width:0;font-size:8pt;table-layout:auto}th,td{padding:6px 7px;max-width:none;overflow-wrap:break-word;word-break:normal}th{position:static}.hero,section{padding:16px;margin:10px 0}.quick-stack,.quick-attention{padding:11px;margin:7px 0}.quick-stack .section-head h2,.quick-attention .section-head h2{margin-bottom:3px}.system-layer{padding:7px 0}.layer-copy p{margin:.1rem 0}.quick-attention .finding{padding:9px;margin:6px 0}.quick-attention .finding p{margin:.2rem 0}.evidence{break-inside:auto}.evidence pre{display:none}.compact-provenance{break-inside:avoid}}
+	.change-warning{margin:14px 0;padding:14px;border:1px solid #b7791f;border-left:5px solid var(--amber);border-radius:12px;background:#2b2115}.change-warning>span{display:block;color:var(--amber);font-size:.7rem;font-weight:900;letter-spacing:.09em}.change-warning pre{border-color:#765522}
+	</style></head><body><main>
+<header class="hero"><p class="eyebrow">SCREWDRIVER · COMPLETE ROBOT SYSTEM BLUEPRINT</p><h1>cutie</h1><p class="lede">A bottom-to-top specification of the collected robot computer: hardware foundation, buses, devices, Linux integration, execution environment, ROS graph, software stacks and end-to-end capabilities.</p><div class="provenance-strip">
+<span><small>ANALYSIS</small><strong>deterministic analysis</strong></span>
+<span><small>COLLECTED</small><strong>2026-08-11 07:05:13 PDT</strong></span>
+<span><small>SCAN</small><strong>2026-08-11_07-05-13</strong></span>
+<span><small>MODE</small><strong>Passive · no repairs</strong></span>
+</div></header>
+<nav class="toc" aria-label="Report sections"><a href="#summary">Summary</a><a href="#platform">Platform</a><a href="#storage">Storage</a><a href="#buses">Buses</a><a href="#devices">Devices</a><a href="#linux">Linux</a><a href="#network">Network</a><a href="#execution">Execution</a><a href="#ros-environment">ROS env</a><a href="#ros-graph">ROS graph</a><a href="#software">Stacks</a><a href="#capabilities">Capabilities</a><a href="#interpretation">Interpretation</a></nav>
+
+<section id="summary"><p class="eyebrow">01 · COMPLETE SYSTEM SUMMARY</p><h2>What system was inspected</h2>
+  <p class="lede">cutie is a NVIDIA Jetson Orin Nano Engineering Reference Developer Kit Super running Ubuntu 22.04.5 LTS. Its default network path is enP8p1s0 through 192.168.4.1. The live ROS 2 graph contains 0 nodes and 7 topics. Robot-facing USB evidence includes Realtek Bluetooth Radio, STMicroelectronics STM32 STLink, Silicon Labs CP2102N USB to UART Bridge Controller, Seeed Studio reSpeaker XVF3800 4-Mic Array, QDtech MPI5001. Installed robotics/platform software includes ROS installation and environment, Robot State Publisher, colcon, rosdep, vcstool, Docker, CUDA Toolkit. Presence is reported separately from configuration, runtime participation, integration, and functional verification.</p>
+  <div class="table-wrap"><table><thead><tr><th>System layer</th><th>Collected specification</th></tr></thead><tbody><tr><td>Computer</td><td>NVIDIA · NVIDIA Jetson Orin Nano Engineering Reference Developer Kit Super</td></tr><tr><td>Operating system</td><td>Ubuntu 22.04.5 LTS · kernel 5.15.199-tegra · aarch64</td></tr><tr><td>Compute</td><td>ARMv8 Processor rev 1 (v8l) · 6 cores · Orin (nvgpu)</td></tr><tr><td>Memory</td><td>4.5 GiB used of 7.4 GiB (60.2%) · swap 43.6%</td></tr><tr><td>Root storage</td><td>/dev/nvme0n1p1 · ext4 · 455.9 GiB · 7.3% used</td></tr><tr><td>Primary network</td><td>enP8p1s0 · 192.168.4.68/22 · gateway 192.168.4.1</td></tr><tr><td>Physical I/O</td><td>5 robot-facing USB peripherals · 9 serial interfaces · 1 sensors · 0 actuators</td></tr><tr><td>ROS 2</td><td>humble · graph RUNNING · domain 0 · 0 nodes / 7 topics / 12 services / 0 actions</td></tr><tr><td>Robotics software</td><td>ROS installation and environment, Robot State Publisher, colcon, rosdep, vcstool, Docker, CUDA Toolkit</td></tr></tbody></table></div>
+</section>
+<section id="platform"><p class="eyebrow">02 · BASE HARDWARE PLATFORM</p><h2>Board, operating system and compute resources</h2>
+  <h3>Board and platform identity</h3><div class="table-wrap"><table><thead><tr><th>Property</th><th>Value</th></tr></thead><tbody><tr><td>Hostname</td><td>cutie</td></tr><tr><td>Manufacturer</td><td>NVIDIA</td></tr><tr><td>Product</td><td>NVIDIA Jetson Orin Nano Engineering Reference Developer Kit Super</td></tr><tr><td>Board</td><td>Jetson</td></tr><tr><td>Board version</td><td>Not Specified</td></tr><tr><td>Firmware / L4T</td><td>36.5.2-gcid-46426093</td></tr><tr><td>Machine type</td><td>physical computer</td></tr><tr><td>Operating system</td><td>Ubuntu 22.04.5 LTS</td></tr><tr><td>Kernel</td><td>5.15.199-tegra</td></tr><tr><td>Kernel build</td><td>#1 SMP PREEMPT Thu Jul 16 11:27:38 PDT 2026</td></tr><tr><td>Architecture</td><td>aarch64</td></tr><tr><td>Boot mode</td><td>UEFI</td></tr><tr><td>Init system</td><td>systemd</td></tr><tr><td>Package manager</td><td>apt</td></tr><tr><td>Uptime</td><td>12 h 34 min 55 sec</td></tr><tr><td>Processes observed</td><td>353</td></tr></tbody></table></div>
+  <div class="two-col"><div><h3>CPU</h3><div class="table-wrap"><table><thead><tr><th>Property</th><th>Value</th></tr></thead><tbody><tr><td>Model</td><td>ARMv8 Processor rev 1 (v8l)</td></tr><tr><td>Vendor</td><td>0x41</td></tr><tr><td>Physical cores</td><td>6</td></tr><tr><td>Logical / online CPUs</td><td>6 / 6</td></tr><tr><td>Frequency</td><td>current 1228.8 MHz · range 729.6–1728.0 MHz</td></tr><tr><td>Governor</td><td>schedutil</td></tr><tr><td>Usage snapshot</td><td>0.0%</td></tr><tr><td>Load average</td><td>0.02978515625, 0.01123046875, 0.02587890625</td></tr><tr><td>Caches</td><td>L1 data: 384 KiB (6 instances); L1 instruction: 384 KiB (6 instances); L2: 1.5 MiB (6 instances); L3: 4 MiB (2 instances)</td></tr></tbody></table></div></div><div><h3>Memory</h3><div class="table-wrap"><table><thead><tr><th>Property</th><th>Value</th></tr></thead><tbody><tr><td>Total</td><td>7.4 GiB</td></tr><tr><td>Used</td><td>4.5 GiB</td></tr><tr><td>Available</td><td>3.0 GiB</td></tr><tr><td>Usage</td><td>60.2%</td></tr><tr><td>Swap total</td><td>3.7 GiB</td></tr><tr><td>Swap used</td><td>1.6 GiB</td></tr><tr><td>Swap usage</td><td>43.6%</td></tr></tbody></table></div></div></div>
+  <h3>GPU and accelerators</h3><div class="table-wrap"><table><thead><tr><th>GPU / accelerator</th><th>Vendor</th><th>Driver</th><th>Bus</th><th>Memory</th><th>Utilization</th><th>Temperature</th></tr></thead><tbody><tr><td>Orin (nvgpu)</td><td>NVIDIA</td><td>540.5.0</td><td>[N/A]</td><td>Not reported</td><td>Not reported</td><td>Not reported</td></tr></tbody></table></div>
+</section>
+<section id="storage"><p class="eyebrow">03 · STORAGE, POWER AND THERMALS</p><h2>Persistent storage and operating envelope</h2>
+  <p class="section-intro">Root filesystem: /dev/nvme0n1p1 · / · 7.3%</p>
+  <div class="table-wrap"><table><thead><tr><th>Function</th><th>Device</th><th>Path</th><th>Connection / filesystem</th><th>Capacity</th><th>Access</th><th>Mount / usage</th></tr></thead><tbody><tr><td>Embedded/debug removable media</td><td>microcontroller</td><td>/dev/sda</td><td>usb</td><td>1.5 MiB</td><td>Read-write</td><td>Device</td></tr><tr><td>Compressed RAM swap</td><td>Model not reported</td><td>/dev/zram0</td><td>Not reported</td><td>633.9 MiB</td><td>Read-write</td><td>Device</td></tr><tr><td>Compressed RAM swap</td><td>Model not reported</td><td>/dev/zram1</td><td>Not reported</td><td>633.9 MiB</td><td>Read-write</td><td>Device</td></tr><tr><td>Compressed RAM swap</td><td>Model not reported</td><td>/dev/zram2</td><td>Not reported</td><td>633.9 MiB</td><td>Read-write</td><td>Device</td></tr><tr><td>Compressed RAM swap</td><td>Model not reported</td><td>/dev/zram3</td><td>Not reported</td><td>633.9 MiB</td><td>Read-write</td><td>Device</td></tr><tr><td>Compressed RAM swap</td><td>Model not reported</td><td>/dev/zram4</td><td>Not reported</td><td>633.9 MiB</td><td>Read-write</td><td>Device</td></tr><tr><td>Compressed RAM swap</td><td>Model not reported</td><td>/dev/zram5</td><td>Not reported</td><td>633.9 MiB</td><td>Read-write</td><td>Device</td></tr><tr><td>Primary NVMe storage</td><td>WD Green SN3000 500GB</td><td>/dev/nvme0n1</td><td>nvme</td><td>465.8 GiB</td><td>Read-write</td><td>Device</td></tr><tr><td>Root filesystem</td><td>WD Green SN3000 500GB</td><td>/dev/nvme0n1p1</td><td>ext4</td><td>455.9 GiB</td><td>Read-write</td><td>/ · 7.3% used · 401.0 GiB available</td></tr><tr><td>Mounted filesystem</td><td>WD Green SN3000 500GB</td><td>/dev/nvme0n1p10</td><td>vfat</td><td>63.0 MiB</td><td>Read-write</td><td>/boot/efi · 0.1% used · 62.9 MiB available</td></tr></tbody></table></div>
+  <div class="two-col"><div><h3>Power</h3><div class="table-wrap"><table><thead><tr><th>Property</th><th>Value</th></tr></thead><tbody><tr><td>source</td><td>external or unknown</td></tr><tr><td>battery_present</td><td>No</td></tr><tr><td>battery_percent</td><td>Not reported</td></tr><tr><td>charging</td><td>Not reported</td></tr><tr><td>seconds_remaining</td><td>Not reported</td></tr><tr><td>details</td><td>None</td></tr></tbody></table></div></div><div><h3>Thermal and cooling observations</h3><div class="table-wrap"><table><thead><tr><th>Sensor</th><th>Temperature</th><th>Critical limit</th><th>State</th></tr></thead><tbody><tr><td>cpu-thermal: sensor 0</td><td>50.875 °C</td><td>104.5 °C</td><td>Not reported</td></tr><tr><td>gpu-thermal: sensor 0</td><td>51.187 °C</td><td>104.5 °C</td><td>Not reported</td></tr><tr><td>soc0-thermal: sensor 0</td><td>50.5 °C</td><td>104.5 °C</td><td>Not reported</td></tr><tr><td>soc1-thermal: sensor 0</td><td>51.156 °C</td><td>104.5 °C</td><td>Not reported</td></tr><tr><td>soc2-thermal: sensor 0</td><td>49.343 °C</td><td>104.5 °C</td><td>Not reported</td></tr><tr><td>tj-thermal: sensor 0</td><td>51.25 °C</td><td>0.00010449999999999999 °C</td><td>Not reported</td></tr></tbody></table></div></div></div>
+</section>
+<section id="buses"><p class="eyebrow">04 · PHYSICAL BUSES AND CONTROLLERS</p><h2>How hardware reaches the computer</h2>
+  <div class="table-wrap"><table><thead><tr><th>Bus / transport</th><th>Collected evidence</th><th>Role</th></tr></thead><tbody><tr><td>USB</td><td>2 host controllers · 4 hubs · 3 downstream devices</td><td>Sensors, audio, HID, MCU/debug and serial bridges</td></tr><tr><td>Serial / UART</td><td>9 interfaces · 2 stable identities</td><td>MCU, controller and board communication</td></tr><tr><td>CAN</td><td>can0 (down)</td><td>Robot control bus when required</td></tr><tr><td>PCIe / I²C / SPI / GPIO</td><td>Dedicated controller inventory not collected in this schema</td><td>Not interpreted as absent</td></tr></tbody></table></div>
+  <h3>Complete USB topology</h3><div class="table-wrap"><table><thead><tr><th>Bus/device</th><th>Identity</th><th>Class</th><th>USB link</th><th>Drivers</th></tr></thead><tbody><tr><td>1:1</td><td>Linux 5.15.199-tegra xhci-hcd xHCI Host Controller [1d6b:0002]</td><td>hub</td><td>USB 2.00 · 480.0 Mb/s</td><td>usb</td></tr><tr><td>1:2</td><td>Generic 4-Port USB 2.0 Hub [0bda:5489]</td><td>hub</td><td>USB 2.10 · 480.0 Mb/s</td><td>hub, usb</td></tr><tr><td>1:3</td><td>Realtek Bluetooth Radio [13d3:3549]</td><td>wireless controller</td><td>USB 1.00 · 12.0 Mb/s</td><td>rtk_btusb, usb</td></tr><tr><td>1:4</td><td>STMicroelectronics STM32 STLink [0483:374b]</td><td>miscellaneous</td><td>USB 2.00 · 12.0 Mb/s</td><td>cdc_acm, usb, usb-storage</td></tr><tr><td>1:6</td><td>Silicon Labs CP2102N USB to UART Bridge Controller [10c4:ea60]</td><td>defined at interface level</td><td>USB 2.00 · 12.0 Mb/s</td><td>cp210x, usb</td></tr><tr><td>1:7</td><td>Seeed Studio reSpeaker XVF3800 4-Mic Array [2886:001a]</td><td>miscellaneous</td><td>USB 2.01 · 480.0 Mb/s</td><td>snd-usb-audio, usb, usbhid</td></tr><tr><td>1:8</td><td>QDtech MPI5001 [0484:5750]</td><td>defined at interface level</td><td>USB 0.01 · 12.0 Mb/s</td><td>usb, usbhid</td></tr><tr><td>2:1</td><td>Linux 5.15.199-tegra xhci-hcd xHCI Host Controller [1d6b:0003]</td><td>hub</td><td>USB 3.10 · 10000.0 Mb/s</td><td>usb</td></tr><tr><td>2:2</td><td>Generic 4-Port USB 3.0 Hub [0bda:0489]</td><td>hub</td><td>USB 3.20 · 10000.0 Mb/s</td><td>hub, usb</td></tr></tbody></table></div>
+  <p class="section-intro">PCIe, I²C, SPI and GPIO controller inventories are shown only when collected. Their absence from this snapshot is not interpreted as hardware absence.</p>
+</section>
+<section id="devices"><p class="eyebrow">05 · PHYSICAL DEVICE INVENTORY</p><h2>Robot-facing hardware grouped by function</h2>
+  <h3>USB peripherals</h3><div class="table-wrap"><table><thead><tr><th>Device</th><th>USB identity</th><th>Link</th><th>Kernel drivers</th><th>Device nodes / access</th></tr></thead><tbody><tr><td>Realtek Bluetooth Radio</td><td>13d3:3549</td><td>bus 1 · USB 1.00 · 12.0 Mb/s</td><td>rtk_btusb, usb</td><td>/dev/bus/usb/001/003 · crw-rw-r-- · root:root · read-only, /dev/char/189:2 · crw-rw-r-- · root:root · read-only</td></tr><tr><td>STMicroelectronics STM32 STLink</td><td>0483:374b</td><td>bus 1 · USB 2.00 · 12.0 Mb/s</td><td>cdc_acm, usb, usb-storage</td><td>/dev/block/8:0 · brw-rw---- · root:disk · denied, /dev/bsg/0:0:0:0 · crw------- · root:root · denied, /dev/bus/usb/001/004 · crw-rw---- · root:plugdev · read-write, /dev/char/166:0 · crw-rw---- · root:plugdev · read-write, /dev/char/189:3 · crw-rw---- · root:plugdev · read-write, /dev/char/245:0 · crw------- · root:root · denied, /dev/disk/by-id/usb-MBED_microcontroller_0665FF575171525067053428-0:0 · brw-rw---- · root:disk · denied, /dev/disk/by-label/NOD_F446RE · brw-rw---- · root:disk · denied, /dev/disk/by-path/platform-3610000.usb-usb-0:2.1:1.1-scsi-0:0:0:0 · brw-rw---- · root:disk · denied, /dev/disk/by-uuid/2702-1974 · brw-rw---- · root:disk · denied, /dev/sda · brw-rw---- · root:disk · denied, /dev/serial/by-id/usb-STMicroelectronics_STM32_STLink_0665FF575171525067053428-if02 · crw-rw---- · root:plugdev · read-write, /dev/serial/by-path/platform-3610000.usb-usb-0:2.1:1.2 · crw-rw---- · root:plugdev · read-write, /dev/ttyACM0 · crw-rw---- · root:plugdev · read-write</td></tr><tr><td>Silicon Labs CP2102N USB to UART Bridge Controller</td><td>10c4:ea60</td><td>bus 1 · USB 2.00 · 12.0 Mb/s</td><td>cp210x, usb</td><td>/dev/bus/usb/001/006 · crw-rw-r-- · root:root · read-only, /dev/char/188:0 · crw-rw---- · root:dialout · denied, /dev/char/189:5 · crw-rw-r-- · root:root · read-only, /dev/char/254:2 · crw-rw---- · root:plugdev · read-write, /dev/gpiochip2 · crw-rw---- · root:plugdev · read-write, /dev/serial/by-id/usb-Silicon_Labs_CP2102N_USB_to_UART_Bridge_Controller_720a07b73a70f0118fdd8a301045c30f-if00-port0 · crw-rw---- · root:dialout · denied, /dev/serial/by-path/platform-3610000.usb-usb-0:2.4:1.0-port0 · crw-rw---- · root:dialout · denied, /dev/ttyUSB0 · crw-rw---- · root:dialout · denied</td></tr><tr><td>Seeed Studio reSpeaker XVF3800 4-Mic Array</td><td>2886:001a</td><td>bus 1 · USB 2.01 · 480.0 Mb/s</td><td>snd-usb-audio, usb, usbhid</td><td>/dev/bus/usb/001/007 · crw-rw-r-- · root:root · read-only, /dev/char/116:50 · crw-rw---- · root:audio · read-write, /dev/char/116:51 · crw-rw---- · root:audio · read-write, /dev/char/116:52 · crw-rw---- · root:audio · read-write, /dev/char/13:70 · crw-rw---- · root:input · denied, /dev/char/13:71 · crw-rw---- · root:input · denied, /dev/char/13:72 · crw-rw---- · root:input · denied, /dev/char/189:6 · crw-rw-r-- · root:root · read-only, /dev/char/510:1 · crw------- · root:root · denied, /dev/hidraw1 · crw------- · root:root · denied, /dev/input/by-id/usb-Seeed_Studio_reSpeaker_XVF3800_4-Mic_Array_101991441261600088-event-if05 · crw-rw---- · root:input · denied, /dev/input/by-path/platform-3610000.usb-usb-0:1:1.5-event · crw-rw---- · root:input · denied, /dev/input/event6 · crw-rw---- · root:input · denied, /dev/input/event7 · crw-rw---- · root:input · denied, /dev/input/event8 · crw-rw---- · root:input · denied, /dev/snd/by-id/usb-Seeed_Studio_reSpeaker_XVF3800_4-Mic_Array_101991441261600088-00 · crw-rw---- · root:audio · read-write, /dev/snd/by-path/platform-3610000.usb-usb-0:1:1.0 · crw-rw---- · root:audio · read-write, /dev/snd/controlC2 · crw-rw---- · root:audio · read-write, /dev/snd/pcmC2D0c · crw-rw---- · root:audio · read-write, /dev/snd/pcmC2D0p · crw-rw---- · root:audio · read-write</td></tr><tr><td>QDtech MPI5001</td><td>0484:5750</td><td>bus 1 · USB 0.01 · 12.0 Mb/s</td><td>usb, usbhid</td><td>/dev/bus/usb/001/008 · crw-rw-r-- · root:root · read-only, /dev/char/13:65 · crw-rw---- · root:input · denied, /dev/char/189:7 · crw-rw-r-- · root:root · read-only, /dev/char/510:0 · crw------- · root:root · denied, /dev/hidraw0 · crw------- · root:root · denied, /dev/input/by-id/usb-QDtech_MPI5001-event-if00 · crw-rw---- · root:input · denied, /dev/input/by-path/platform-3610000.usb-usb-0:2.2:1.0-event · crw-rw---- · root:input · denied, /dev/input/event1 · crw-rw---- · root:input · denied</td></tr></tbody></table></div>
+  <h3>Serial and MCU interfaces</h3><div class="table-wrap"><table><thead><tr><th>Interface</th><th>Driver / transport</th><th>Stable identity</th><th>Physical path</th><th>Permissions / access</th></tr></thead><tbody><tr><td>STMicroelectronics STM32 STLink · /dev/ttyACM0</td><td>cdc_acm · usb-cdc-acm</td><td>/dev/serial/by-id/usb-STMicroelectronics_STM32_STLink_0665FF575171525067053428-if02</td><td>/dev/serial/by-path/platform-3610000.usb-usb-0:2.1:1.2</td><td>/dev/ttyACM0 · crw-rw---- · root:plugdev · read-write</td></tr><tr><td>ttyAMA0 · /dev/ttyAMA0</td><td>sbsa-uart · onboard-uart</td><td>Not reported</td><td>Not reported</td><td>/dev/ttyAMA0 · crw-rw---- · root:dialout · denied</td></tr><tr><td>ttyS0 · /dev/ttyS0</td><td>serial8250 · onboard-uart</td><td>Not reported</td><td>Not reported</td><td>/dev/ttyS0 · crw-rw---- · root:dialout · denied</td></tr><tr><td>ttyS1 · /dev/ttyS1</td><td>serial8250 · onboard-uart</td><td>Not reported</td><td>Not reported</td><td>/dev/ttyS1 · crw-rw---- · root:dialout · denied</td></tr><tr><td>ttyS2 · /dev/ttyS2</td><td>serial8250 · onboard-uart</td><td>Not reported</td><td>Not reported</td><td>/dev/ttyS2 · crw-rw---- · root:dialout · denied</td></tr><tr><td>ttyS3 · /dev/ttyS3</td><td>serial8250 · onboard-uart</td><td>Not reported</td><td>Not reported</td><td>/dev/ttyS3 · crw-rw---- · root:dialout · denied</td></tr><tr><td>ttyTHS1 · /dev/ttyTHS1</td><td>serial-tegra · onboard-uart</td><td>Not reported</td><td>Not reported</td><td>/dev/ttyTHS1 · crw-rw---- · root:dialout · denied</td></tr><tr><td>ttyTHS2 · /dev/ttyTHS2</td><td>serial-tegra · onboard-uart</td><td>Not reported</td><td>Not reported</td><td>/dev/ttyTHS2 · crw-rw---- · root:dialout · denied</td></tr><tr><td>Silicon Labs CP2102N USB to UART Bridge Controller · /dev/ttyUSB0</td><td>cp210x · usb-serial</td><td>/dev/serial/by-id/usb-Silicon_Labs_CP2102N_USB_to_UART_Bridge_Controller_720a07b73a70f0118fdd8a301045c30f-if00-port0</td><td>/dev/serial/by-path/platform-3610000.usb-usb-0:2.4:1.0-port0</td><td>/dev/ttyUSB0 · crw-rw---- · root:dialout · denied</td></tr></tbody></table></div>
+  <h3>Detected sensors</h3><div class="table-wrap"><table><thead><tr><th>Component</th><th>Role</th><th>Bus / protocol</th><th>Driver</th><th>Channel</th><th>Observed state</th><th>Evidence</th></tr></thead><tbody><tr><td>Seeed Studio reSpeaker XVF3800 4-Mic Array</td><td>microphone</td><td>USB</td><td>snd-usb-audio, usb, usbhid</td><td>/dev/bus/usb/001/007, /dev/char/116:50, /dev/char/116:51, /dev/char/116:52, /dev/char/13:70, /dev/char/13:71, /dev/char/13:72, /dev/char/189:6, /dev/char/510:1, /dev/hidraw1, /dev/input/by-id/usb-Seeed_Studio_reSpeaker_XVF3800_4-Mic_Array_101991441261600088-event-if05, /dev/input/by-path/platform-3610000.usb-usb-0:1:1.5-event, /dev/input/event6, /dev/input/event7, /dev/input/event8, /dev/snd/by-id/usb-Seeed_Studio_reSpeaker_XVF3800_4-Mic_Array_101991441261600088-00, /dev/snd/by-path/platform-3610000.usb-usb-0:1:1.0, /dev/snd/controlC2, /dev/snd/pcmC2D0c, /dev/snd/pcmC2D0p</td><td>PRESENT_NOT_EXERCISED</td><td>VERIFIED</td></tr></tbody></table></div>
+  <h3>Detected actuators and outputs</h3><div class="empty"><p>No actuator inventory record was collected.</p></div>
+</section>
+<section id="linux"><p class="eyebrow">06 · LINUX DEVICE AND DRIVER LAYER</p><h2>Physical device → driver → device path → access</h2>
+  <div class="table-wrap"><table><thead><tr><th>Physical component</th><th>Bus / identity</th><th>Kernel driver</th><th>Device path and access</th><th>Runtime owner</th></tr></thead><tbody><tr><td>Realtek Bluetooth Radio</td><td>USB 13d3:3549</td><td>rtk_btusb, usb</td><td>/dev/bus/usb/001/003 · crw-rw-r-- · root:root · read-only, /dev/char/189:2 · crw-rw-r-- · root:root · read-only</td><td>Process owner not collected</td></tr><tr><td>STMicroelectronics STM32 STLink</td><td>USB 0483:374b</td><td>cdc_acm, usb, usb-storage</td><td>/dev/block/8:0 · brw-rw---- · root:disk · denied, /dev/bsg/0:0:0:0 · crw------- · root:root · denied, /dev/bus/usb/001/004 · crw-rw---- · root:plugdev · read-write, /dev/char/166:0 · crw-rw---- · root:plugdev · read-write, /dev/char/189:3 · crw-rw---- · root:plugdev · read-write, /dev/char/245:0 · crw------- · root:root · denied, /dev/disk/by-id/usb-MBED_microcontroller_0665FF575171525067053428-0:0 · brw-rw---- · root:disk · denied, /dev/disk/by-label/NOD_F446RE · brw-rw---- · root:disk · denied, /dev/disk/by-path/platform-3610000.usb-usb-0:2.1:1.1-scsi-0:0:0:0 · brw-rw---- · root:disk · denied, /dev/disk/by-uuid/2702-1974 · brw-rw---- · root:disk · denied, /dev/sda · brw-rw---- · root:disk · denied, /dev/serial/by-id/usb-STMicroelectronics_STM32_STLink_0665FF575171525067053428-if02 · crw-rw---- · root:plugdev · read-write, /dev/serial/by-path/platform-3610000.usb-usb-0:2.1:1.2 · crw-rw---- · root:plugdev · read-write, /dev/ttyACM0 · crw-rw---- · root:plugdev · read-write</td><td>Process owner not collected</td></tr><tr><td>Silicon Labs CP2102N USB to UART Bridge Controller</td><td>USB 10c4:ea60</td><td>cp210x, usb</td><td>/dev/bus/usb/001/006 · crw-rw-r-- · root:root · read-only, /dev/char/188:0 · crw-rw---- · root:dialout · denied, /dev/char/189:5 · crw-rw-r-- · root:root · read-only, /dev/char/254:2 · crw-rw---- · root:plugdev · read-write, /dev/gpiochip2 · crw-rw---- · root:plugdev · read-write, /dev/serial/by-id/usb-Silicon_Labs_CP2102N_USB_to_UART_Bridge_Controller_720a07b73a70f0118fdd8a301045c30f-if00-port0 · crw-rw---- · root:dialout · denied, /dev/serial/by-path/platform-3610000.usb-usb-0:2.4:1.0-port0 · crw-rw---- · root:dialout · denied, /dev/ttyUSB0 · crw-rw---- · root:dialout · denied</td><td>Process owner not collected</td></tr><tr><td>Seeed Studio reSpeaker XVF3800 4-Mic Array</td><td>USB 2886:001a</td><td>snd-usb-audio, usb, usbhid</td><td>/dev/bus/usb/001/007 · crw-rw-r-- · root:root · read-only, /dev/char/116:50 · crw-rw---- · root:audio · read-write, /dev/char/116:51 · crw-rw---- · root:audio · read-write, /dev/char/116:52 · crw-rw---- · root:audio · read-write, /dev/char/13:70 · crw-rw---- · root:input · denied, /dev/char/13:71 · crw-rw---- · root:input · denied, /dev/char/13:72 · crw-rw---- · root:input · denied, /dev/char/189:6 · crw-rw-r-- · root:root · read-only, /dev/char/510:1 · crw------- · root:root · denied, /dev/hidraw1 · crw------- · root:root · denied, /dev/input/by-id/usb-Seeed_Studio_reSpeaker_XVF3800_4-Mic_Array_101991441261600088-event-if05 · crw-rw---- · root:input · denied, /dev/input/by-path/platform-3610000.usb-usb-0:1:1.5-event · crw-rw---- · root:input · denied, /dev/input/event6 · crw-rw---- · root:input · denied, /dev/input/event7 · crw-rw---- · root:input · denied, /dev/input/event8 · crw-rw---- · root:input · denied, /dev/snd/by-id/usb-Seeed_Studio_reSpeaker_XVF3800_4-Mic_Array_101991441261600088-00 · crw-rw---- · root:audio · read-write, /dev/snd/by-path/platform-3610000.usb-usb-0:1:1.0 · crw-rw---- · root:audio · read-write, /dev/snd/controlC2 · crw-rw---- · root:audio · read-write, /dev/snd/pcmC2D0c · crw-rw---- · root:audio · read-write, /dev/snd/pcmC2D0p · crw-rw---- · root:audio · read-write</td><td>Process owner not collected</td></tr><tr><td>QDtech MPI5001</td><td>USB 0484:5750</td><td>usb, usbhid</td><td>/dev/bus/usb/001/008 · crw-rw-r-- · root:root · read-only, /dev/char/13:65 · crw-rw---- · root:input · denied, /dev/char/189:7 · crw-rw-r-- · root:root · read-only, /dev/char/510:0 · crw------- · root:root · denied, /dev/hidraw0 · crw------- · root:root · denied, /dev/input/by-id/usb-QDtech_MPI5001-event-if00 · crw-rw---- · root:input · denied, /dev/input/by-path/platform-3610000.usb-usb-0:2.2:1.0-event · crw-rw---- · root:input · denied, /dev/input/event1 · crw-rw---- · root:input · denied</td><td>Process owner not collected</td></tr><tr><td>STMicroelectronics STM32 STLink</td><td>usb-cdc-acm</td><td>cdc_acm</td><td>/dev/ttyACM0 · crw-rw---- · root:plugdev · read-write</td><td>Process owner not collected</td></tr><tr><td>ttyAMA0</td><td>onboard-uart</td><td>sbsa-uart</td><td>/dev/ttyAMA0 · crw-rw---- · root:dialout · denied</td><td>Process owner not collected</td></tr><tr><td>ttyS0</td><td>onboard-uart</td><td>serial8250</td><td>/dev/ttyS0 · crw-rw---- · root:dialout · denied</td><td>Process owner not collected</td></tr><tr><td>ttyS1</td><td>onboard-uart</td><td>serial8250</td><td>/dev/ttyS1 · crw-rw---- · root:dialout · denied</td><td>Process owner not collected</td></tr><tr><td>ttyS2</td><td>onboard-uart</td><td>serial8250</td><td>/dev/ttyS2 · crw-rw---- · root:dialout · denied</td><td>Process owner not collected</td></tr><tr><td>ttyS3</td><td>onboard-uart</td><td>serial8250</td><td>/dev/ttyS3 · crw-rw---- · root:dialout · denied</td><td>Process owner not collected</td></tr><tr><td>ttyTHS1</td><td>onboard-uart</td><td>serial-tegra</td><td>/dev/ttyTHS1 · crw-rw---- · root:dialout · denied</td><td>Process owner not collected</td></tr><tr><td>ttyTHS2</td><td>onboard-uart</td><td>serial-tegra</td><td>/dev/ttyTHS2 · crw-rw---- · root:dialout · denied</td><td>Process owner not collected</td></tr><tr><td>Silicon Labs CP2102N USB to UART Bridge Controller</td><td>usb-serial</td><td>cp210x</td><td>/dev/ttyUSB0 · crw-rw---- · root:dialout · denied</td><td>Process owner not collected</td></tr></tbody></table></div>
+  <p class="section-intro">Process ownership is displayed only when the collector or a validated probe established it.</p>
+</section>
+<section id="network"><p class="eyebrow">07 · NETWORK AND COMMUNICATION ARCHITECTURE</p><h2>External, internal and virtual transports</h2><div class="table-wrap"><table><thead><tr><th>Property</th><th>Value</th></tr></thead><tbody><tr><td>Default interface</td><td>enP8p1s0</td></tr><tr><td>Gateway</td><td>192.168.4.1</td></tr><tr><td>Internet route</td><td>Yes</td></tr><tr><td>DNS</td><td>127.0.0.53 (systemd-resolved local stub)</td></tr></tbody></table></div><div class="table-wrap"><table><thead><tr><th>Role</th><th>Interface</th><th>Type</th><th>State</th><th>IPv4</th><th>MAC</th><th>Mb/s</th><th>MTU</th><th>Driver</th></tr></thead><tbody><tr><td>Loopback</td><td>lo</td><td>loopback</td><td>up</td><td>127.0.0.1/8</td><td>00:00:00:00:00:00</td><td>Not reported</td><td>65536</td><td>Not reported</td></tr><tr><td>Secondary</td><td>wlP1p1s0</td><td>wifi</td><td>down</td><td>None</td><td>50:2e:91:f3:32:13</td><td>Not reported</td><td>1500</td><td>rtl88x2ce</td></tr><tr><td>CAN</td><td>can0</td><td>ethernet</td><td>down</td><td>None</td><td>Not reported</td><td>Not reported</td><td>16</td><td>mttcan</td></tr><tr><td>Primary</td><td>enP8p1s0</td><td>ethernet</td><td>up</td><td>192.168.4.68/22</td><td>ac:3a:e2:7c:15:d4</td><td>1000</td><td>1500</td><td>r8168</td></tr><tr><td>Virtual</td><td>l4tbr0</td><td>USB-gadget network</td><td>down</td><td>None</td><td>2a:3e:30:a7:52:ce</td><td>Not reported</td><td>1500</td><td>Not reported</td></tr><tr><td>USB gadget</td><td>usb0</td><td>USB-gadget network</td><td>up</td><td>None</td><td>aa:a1:87:c2:01:d1</td><td>Not reported</td><td>1500</td><td>Not reported</td></tr><tr><td>USB gadget</td><td>usb1</td><td>USB-gadget network</td><td>up</td><td>None</td><td>aa:a1:87:c2:01:d3</td><td>Not reported</td><td>1500</td><td>Not reported</td></tr><tr><td>Virtual</td><td>docker0</td><td>virtual</td><td>up</td><td>172.17.0.1/16</td><td>92:a7:62:8b:c5:42</td><td>Not reported</td><td>1500</td><td>Not reported</td></tr></tbody></table></div></section>
+<section id="execution"><p class="eyebrow">08 · PROCESSES, SERVICES AND CONTAINERS</p><h2>Software execution environment</h2>
+  <div class="table-wrap"><table><thead><tr><th>Property</th><th>Value</th></tr></thead><tbody><tr><td>Init system</td><td>systemd</td></tr><tr><td>Processes observed</td><td>353</td></tr><tr><td>Docker installed</td><td>Yes</td></tr><tr><td>Docker runtime state</td><td>RUNNING</td></tr><tr><td>Docker executable</td><td>/usr/bin/docker</td></tr><tr><td>Running containers</td><td>Container inventory not collected</td></tr><tr><td>Robotics systemd services</td><td>Service inventory not collected</td></tr><tr><td>Device-owning processes</td><td>Ownership requires validated process/port probes</td></tr><tr><td>Host versus container workload</td><td>Not established by this snapshot</td></tr></tbody></table></div>
+</section>
+<section id="ros-environment"><p class="eyebrow">09 · ROS 2 INSTALLATION AND ENVIRONMENT</p><h2>Installation, shell context and DDS identity</h2>
+  <div class="table-wrap"><table><thead><tr><th>Property</th><th>Value</th></tr></thead><tbody><tr><td>ROS detected</td><td>Yes</td></tr><tr><td>Installed distributions</td><td>humble</td></tr><tr><td>Active distribution in collection shell</td><td>Not reported</td></tr><tr><td>Environment sourced in collection shell</td><td>No</td></tr><tr><td>ROS executable</td><td>Not reported</td></tr><tr><td>Domain ID</td><td>0</td></tr><tr><td>ROS localhost only</td><td>Not reported</td></tr><tr><td>DDS middleware</td><td>Provider default (exact RMW not reported)</td></tr><tr><td>DDS configuration</td><td>Not reported</td></tr><tr><td>Indexed packages</td><td>197</td></tr><tr><td>Installation prefixes</td><td>Not reported</td></tr><tr><td>Workspaces</td><td>Not reported</td></tr><tr><td>Environment recovered from runtime</td><td>Yes</td></tr></tbody></table></div>
+  <div class="callout"><strong>State distinction:</strong> installed software, a sourced shell, a discoverable ROS graph and a functioning robot application are separate evidence states.</div>
+</section>
+<section id="ros-graph"><p class="eyebrow">10 · COMPLETE ROS 2 RUNTIME GRAPH</p><h2>Nodes, topics, services and actions</h2>
+  <div class="table-wrap"><table><thead><tr><th>Property</th><th>Value</th></tr></thead><tbody><tr><td>Graph state</td><td>RUNNING</td></tr><tr><td>Distribution</td><td>humble</td></tr><tr><td>Domain ID</td><td>0</td></tr><tr><td>DDS middleware</td><td>Provider default (exact RMW not reported)</td></tr><tr><td>Discovery</td><td>daemon</td></tr><tr><td>Environment recovered</td><td>Yes</td></tr><tr><td>Nodes</td><td>0</td></tr><tr><td>Topics</td><td>7</td></tr><tr><td>Services</td><td>12</td></tr><tr><td>Actions</td><td>0</td></tr><tr><td>Probe boundary</td><td>metadata only; no publications or hardware commands</td></tr></tbody></table></div>
+  <h3>ROS nodes</h3><div class="empty"><p>No ros nodes were captured.</p></div><h3>ROS topics</h3><div class="table-wrap"><table><thead><tr><th>Name</th><th>State</th><th>Type</th><th>Transport</th></tr></thead><tbody><tr><td>/cutie/brain/status</td><td>AVAILABLE</td><td>std_msgs/msg/String</td><td>DDS</td></tr><tr><td>/cutie/response/text</td><td>AVAILABLE</td><td>std_msgs/msg/String</td><td>DDS</td></tr><tr><td>/cutie/speaker/say</td><td>AVAILABLE</td><td>std_msgs/msg/String</td><td>DDS</td></tr><tr><td>/cutie/speaker/status</td><td>AVAILABLE</td><td>std_msgs/msg/String</td><td>DDS</td></tr><tr><td>/cutie/speech/text</td><td>AVAILABLE</td><td>std_msgs/msg/String</td><td>DDS</td></tr><tr><td>/parameter_events</td><td>AVAILABLE</td><td>rcl_interfaces/msg/ParameterEvent</td><td>DDS</td></tr><tr><td>/rosout</td><td>AVAILABLE</td><td>rcl_interfaces/msg/Log</td><td>DDS</td></tr></tbody></table></div><h3>ROS services</h3><div class="table-wrap"><table><thead><tr><th>Name</th><th>State</th><th>Type</th><th>Transport</th></tr></thead><tbody><tr><td>/cutie_llm/describe_parameters</td><td>AVAILABLE</td><td>rcl_interfaces/srv/DescribeParameters</td><td>DDS request/reply</td></tr><tr><td>/cutie_llm/get_parameter_types</td><td>AVAILABLE</td><td>rcl_interfaces/srv/GetParameterTypes</td><td>DDS request/reply</td></tr><tr><td>/cutie_llm/get_parameters</td><td>AVAILABLE</td><td>rcl_interfaces/srv/GetParameters</td><td>DDS request/reply</td></tr><tr><td>/cutie_llm/list_parameters</td><td>AVAILABLE</td><td>rcl_interfaces/srv/ListParameters</td><td>DDS request/reply</td></tr><tr><td>/cutie_llm/set_parameters</td><td>AVAILABLE</td><td>rcl_interfaces/srv/SetParameters</td><td>DDS request/reply</td></tr><tr><td>/cutie_llm/set_parameters_atomically</td><td>AVAILABLE</td><td>rcl_interfaces/srv/SetParametersAtomically</td><td>DDS request/reply</td></tr><tr><td>/cutie_speaker/describe_parameters</td><td>AVAILABLE</td><td>rcl_interfaces/srv/DescribeParameters</td><td>DDS request/reply</td></tr><tr><td>/cutie_speaker/get_parameter_types</td><td>AVAILABLE</td><td>rcl_interfaces/srv/GetParameterTypes</td><td>DDS request/reply</td></tr><tr><td>/cutie_speaker/get_parameters</td><td>AVAILABLE</td><td>rcl_interfaces/srv/GetParameters</td><td>DDS request/reply</td></tr><tr><td>/cutie_speaker/list_parameters</td><td>AVAILABLE</td><td>rcl_interfaces/srv/ListParameters</td><td>DDS request/reply</td></tr><tr><td>/cutie_speaker/set_parameters</td><td>AVAILABLE</td><td>rcl_interfaces/srv/SetParameters</td><td>DDS request/reply</td></tr><tr><td>/cutie_speaker/set_parameters_atomically</td><td>AVAILABLE</td><td>rcl_interfaces/srv/SetParametersAtomically</td><td>DDS request/reply</td></tr></tbody></table></div><h3>ROS actions</h3><div class="empty"><p>No ros actions were captured.</p></div>
+  <h3 id="data-flow">Publisher → topic → subscriber relationships</h3><p class="section-intro">Graph participation does not prove message rate, payload quality or physical ownership.</p><div class="table-wrap"><table><thead><tr><th>Publisher</th><th>Topic</th><th>Message type</th><th>Subscriber</th></tr></thead><tbody><tr><td>Publisher not captured</td><td>/cutie/brain/status</td><td>std_msgs/msg/String</td><td>No subscriber captured</td></tr><tr><td>Publisher not captured</td><td>/cutie/response/text</td><td>std_msgs/msg/String</td><td>No subscriber captured</td></tr><tr><td>Publisher not captured</td><td>/cutie/speaker/say</td><td>std_msgs/msg/String</td><td>No subscriber captured</td></tr><tr><td>Publisher not captured</td><td>/cutie/speaker/status</td><td>std_msgs/msg/String</td><td>No subscriber captured</td></tr><tr><td>Publisher not captured</td><td>/cutie/speech/text</td><td>std_msgs/msg/String</td><td>No subscriber captured</td></tr></tbody></table></div>
+  <h3>ROS-to-hardware ownership</h3><p class="muted">No records available.</p>
+</section>
+<section id="software"><p class="eyebrow">11 · ROBOTICS SOFTWARE STACKS</p><h2>Installation → configuration → runtime → integration</h2>
+  <p class="section-intro">Software is grouped by capability. Installed never means operational; each later stage requires separate evidence.</p>
+  <div class="stack-grid"><article class="stack-card" id="stack-ros-installation-and-environment">
+<div class="stack-title"><div><p class="eyebrow">software stack</p><h3>ROS installation and environment</h3></div><span class="stage">RUNNING</span></div>
+<p><strong>Packages / version:</strong> Version not reported</p>
+<div class="stage-ladder"><span class="stage-step yes"><small>Installed</small><strong>Yes</strong></span><span class="stage-step unknown"><small>Configured</small><strong>Not established</strong></span><span class="stage-step yes"><small>Running</small><strong>Yes</strong></span><span class="stage-step unknown"><small>Connected</small><strong>Not established</strong></span><span class="stage-step unknown"><small>Integrated</small><strong>Not established</strong></span></div>
+<div class="two-col"><p><strong>Robot capability:</strong><br>Not declared</p><p><strong>Capability state:</strong><br>Not established</p></div>
+<details class="stack-evidence"><summary>Configuration and runtime evidence</summary><div class="table-wrap"><table><thead><tr><th>Evidence field</th><th>Observed value</th></tr></thead><tbody><tr><td>Detected</td><td>Yes</td></tr><tr><td>Environment Sourced</td><td>No</td></tr><tr><td>Installed Distributions</td><td>humble</td></tr><tr><td>Ros Domain Id</td><td>0</td></tr><tr><td>Indexed Package Count</td><td>197</td></tr></tbody></table></div></details></article><article class="stack-card" id="stack-robot-state-publisher">
+<div class="stack-title"><div><p class="eyebrow">software stack</p><h3>Robot State Publisher</h3></div><span class="stage">INSTALLED</span></div>
+<p><strong>Packages / version:</strong> robot_state_publisher</p>
+<div class="stage-ladder"><span class="stage-step yes"><small>Installed</small><strong>Yes</strong></span><span class="stage-step unknown"><small>Configured</small><strong>Not established</strong></span><span class="stage-step no"><small>Running</small><strong>No</strong></span><span class="stage-step unknown"><small>Connected</small><strong>Not established</strong></span><span class="stage-step unknown"><small>Integrated</small><strong>Not established</strong></span></div>
+<div class="two-col"><p><strong>Robot capability:</strong><br>Not declared</p><p><strong>Capability state:</strong><br>Not established</p></div>
+<details class="stack-evidence"><summary>Configuration and runtime evidence</summary><div class="table-wrap"><table><thead><tr><th>Evidence field</th><th>Observed value</th></tr></thead><tbody><tr><td>Package Candidates</td><td>robot_state_publisher</td></tr></tbody></table></div></details></article><article class="stack-card" id="stack-colcon">
+<div class="stack-title"><div><p class="eyebrow">software stack</p><h3>colcon</h3></div><span class="stage">INSTALLED</span></div>
+<p><strong>Packages / version:</strong> Version not reported</p>
+<div class="stage-ladder"><span class="stage-step yes"><small>Installed</small><strong>Yes</strong></span><span class="stage-step unknown"><small>Configured</small><strong>Not established</strong></span><span class="stage-step no"><small>Running</small><strong>No</strong></span><span class="stage-step unknown"><small>Connected</small><strong>Not established</strong></span><span class="stage-step unknown"><small>Integrated</small><strong>Not established</strong></span></div>
+<div class="two-col"><p><strong>Robot capability:</strong><br>Not declared</p><p><strong>Capability state:</strong><br>Not established</p></div>
+<details class="stack-evidence"><summary>Configuration and runtime evidence</summary><div class="table-wrap"><table><thead><tr><th>Evidence field</th><th>Observed value</th></tr></thead><tbody><tr><td>Executable</td><td>/usr/bin/colcon</td></tr></tbody></table></div></details></article><article class="stack-card" id="stack-rosdep">
+<div class="stack-title"><div><p class="eyebrow">software stack</p><h3>rosdep</h3></div><span class="stage">INSTALLED</span></div>
+<p><strong>Packages / version:</strong> Version not reported</p>
+<div class="stage-ladder"><span class="stage-step yes"><small>Installed</small><strong>Yes</strong></span><span class="stage-step unknown"><small>Configured</small><strong>Not established</strong></span><span class="stage-step no"><small>Running</small><strong>No</strong></span><span class="stage-step unknown"><small>Connected</small><strong>Not established</strong></span><span class="stage-step unknown"><small>Integrated</small><strong>Not established</strong></span></div>
+<div class="two-col"><p><strong>Robot capability:</strong><br>Not declared</p><p><strong>Capability state:</strong><br>Not established</p></div>
+<details class="stack-evidence"><summary>Configuration and runtime evidence</summary><div class="table-wrap"><table><thead><tr><th>Evidence field</th><th>Observed value</th></tr></thead><tbody><tr><td>Executable</td><td>/usr/bin/rosdep</td></tr></tbody></table></div></details></article><article class="stack-card" id="stack-vcstool">
+<div class="stack-title"><div><p class="eyebrow">software stack</p><h3>vcstool</h3></div><span class="stage">INSTALLED</span></div>
+<p><strong>Packages / version:</strong> Version not reported</p>
+<div class="stage-ladder"><span class="stage-step yes"><small>Installed</small><strong>Yes</strong></span><span class="stage-step unknown"><small>Configured</small><strong>Not established</strong></span><span class="stage-step no"><small>Running</small><strong>No</strong></span><span class="stage-step unknown"><small>Connected</small><strong>Not established</strong></span><span class="stage-step unknown"><small>Integrated</small><strong>Not established</strong></span></div>
+<div class="two-col"><p><strong>Robot capability:</strong><br>Not declared</p><p><strong>Capability state:</strong><br>Not established</p></div>
+<details class="stack-evidence"><summary>Configuration and runtime evidence</summary><div class="table-wrap"><table><thead><tr><th>Evidence field</th><th>Observed value</th></tr></thead><tbody><tr><td>Executable</td><td>/usr/bin/vcs</td></tr></tbody></table></div></details></article><article class="stack-card" id="stack-docker">
+<div class="stack-title"><div><p class="eyebrow">software stack</p><h3>Docker</h3></div><span class="stage">RUNNING</span></div>
+<p><strong>Packages / version:</strong> Version not reported</p>
+<div class="stage-ladder"><span class="stage-step yes"><small>Installed</small><strong>Yes</strong></span><span class="stage-step unknown"><small>Configured</small><strong>Not established</strong></span><span class="stage-step yes"><small>Running</small><strong>Yes</strong></span><span class="stage-step unknown"><small>Connected</small><strong>Not established</strong></span><span class="stage-step unknown"><small>Integrated</small><strong>Not established</strong></span></div>
+<div class="two-col"><p><strong>Robot capability:</strong><br>Not declared</p><p><strong>Capability state:</strong><br>Not established</p></div>
+<details class="stack-evidence"><summary>Configuration and runtime evidence</summary><div class="table-wrap"><table><thead><tr><th>Evidence field</th><th>Observed value</th></tr></thead><tbody><tr><td>Executable</td><td>/usr/bin/docker</td></tr></tbody></table></div></details></article><article class="stack-card" id="stack-cuda-toolkit">
+<div class="stack-title"><div><p class="eyebrow">software stack</p><h3>CUDA Toolkit</h3></div><span class="stage">INSTALLED</span></div>
+<p><strong>Packages / version:</strong> Version not reported</p>
+<div class="stage-ladder"><span class="stage-step yes"><small>Installed</small><strong>Yes</strong></span><span class="stage-step unknown"><small>Configured</small><strong>Not established</strong></span><span class="stage-step no"><small>Running</small><strong>No</strong></span><span class="stage-step unknown"><small>Connected</small><strong>Not established</strong></span><span class="stage-step unknown"><small>Integrated</small><strong>Not established</strong></span></div>
+<div class="two-col"><p><strong>Robot capability:</strong><br>Not declared</p><p><strong>Capability state:</strong><br>Not established</p></div>
+<details class="stack-evidence"><summary>Configuration and runtime evidence</summary><div class="table-wrap"><table><thead><tr><th>Evidence field</th><th>Observed value</th></tr></thead><tbody><tr><td>Toolkit Root</td><td>/usr/local/cuda</td></tr></tbody></table></div></details></article></div>
+</section>
+<section id="capabilities"><p class="eyebrow">12 · END-TO-END ROBOT CAPABILITY PATHS</p><h2>Physical input/output → Linux → ROS → robot function</h2>
+  <article class="chain"><div class="chain-head"><h3>microphone</h3><span>VERIFIED</span></div>
+<div class="chain-path"><div><small>PHYSICAL</small><strong>Seeed Studio reSpeaker XVF3800 4-Mic Array</strong></div><b>→</b><div><small>LINUX</small><strong>snd-usb-audio, usb, usbhid · /dev/input/by-id/usb-Seeed_Studio_reSpeaker_XVF3800_4-Mic_Array_101991441261600088-event-if05, /dev/snd/by-id/usb-Seeed_Studio_reSpeaker_XVF3800_4-Mic_Array_101991441261600088-00 · 18 more device nodes</strong></div><b>→</b><div><small>ROS / CAPABILITY</small><strong>No physical-to-ROS mapping was established</strong></div></div>
+<p class="state-line">Observed state: <strong>PRESENT_NOT_EXERCISED</strong></p></article><article class="chain"><div class="chain-head"><h3>serial / MCU interface</h3><span>VERIFIED LINUX ENUMERATION</span></div>
+<div class="chain-path"><div><small>PHYSICAL</small><strong>STMicroelectronics STM32 STLink</strong></div><b>→</b><div><small>LINUX</small><strong>cdc_acm · /dev/serial/by-id/usb-STMicroelectronics_STM32_STLink_0665FF575171525067053428-if02</strong></div><b>→</b><div><small>ROS / CAPABILITY</small><strong>Runtime owner and ROS role not established</strong></div></div>
+<p class="state-line">Observed state: <strong>READ-WRITE</strong></p></article><article class="chain"><div class="chain-head"><h3>serial / MCU interface</h3><span>VERIFIED LINUX ENUMERATION</span></div>
+<div class="chain-path"><div><small>PHYSICAL</small><strong>Silicon Labs CP2102N USB to UART Bridge Controller</strong></div><b>→</b><div><small>LINUX</small><strong>cp210x · /dev/serial/by-id/usb-Silicon_Labs_CP2102N_USB_to_UART_Bridge_Controller_720a07b73a70f0118fdd8a301045c30f-if00-port0</strong></div><b>→</b><div><small>ROS / CAPABILITY</small><strong>Runtime owner and ROS role not established</strong></div></div>
+<p class="state-line">Observed state: <strong>DENIED</strong></p></article>
+  <h3>Capability readiness</h3><div class="capability-grid"><article class="capability tone-ok">
+<div class="capability-head"><h3><a href="system-blueprint.html#stack-docker">Docker</a></h3><span class="state">RUNNING</span></div>
+<p class="evidence-line">stage RUNNING</p><p>Runtime evidence exists, but end-to-end robot behavior was not actively exercised.</p></article><article class="capability tone-ok">
+<div class="capability-head"><h3><a href="system-blueprint.html#ros">ROS 2 runtime</a></h3><span class="state">RUNNING</span></div>
+<p class="evidence-line">0 nodes, 7 topics, 12 services on domain 0</p><p>Graph discovery succeeded; endpoint presence still does not prove message flow or physical function.</p></article><article class="capability tone-ok">
+<div class="capability-head"><h3><a href="system-blueprint.html#stack-ros-installation-and-environment">ROS installation and environment</a></h3><span class="state">RUNNING</span></div>
+<p class="evidence-line">stage RUNNING</p><p>Runtime evidence exists, but end-to-end robot behavior was not actively exercised.</p></article><article class="capability tone-neutral">
+<div class="capability-head"><h3><a href="system-blueprint.html#stack-cuda-toolkit">CUDA Toolkit</a></h3><span class="state">INSTALLED</span></div>
+<p class="evidence-line">stage INSTALLED</p><p>Software is available on the host; no active capability is established.</p></article><article class="capability tone-neutral">
+<div class="capability-head"><h3><a href="system-blueprint.html#stack-robot-state-publisher">Robot State Publisher</a></h3><span class="state">INSTALLED</span></div>
+<p class="evidence-line">stage INSTALLED · robot_state_publisher</p><p>Software is available on the host; no active capability is established.</p></article><article class="capability tone-neutral">
+<div class="capability-head"><h3><a href="system-blueprint.html#stack-colcon">colcon</a></h3><span class="state">INSTALLED</span></div>
+<p class="evidence-line">stage INSTALLED</p><p>Software is available on the host; no active capability is established.</p></article><article class="capability tone-neutral">
+<div class="capability-head"><h3><a href="system-blueprint.html#stack-rosdep">rosdep</a></h3><span class="state">INSTALLED</span></div>
+<p class="evidence-line">stage INSTALLED</p><p>Software is available on the host; no active capability is established.</p></article><article class="capability tone-neutral">
+<div class="capability-head"><h3><a href="system-blueprint.html#stack-vcstool">vcstool</a></h3><span class="state">INSTALLED</span></div>
+<p class="evidence-line">stage INSTALLED</p><p>Software is available on the host; no active capability is established.</p></article></div>
+</section>
+<section id="interpretation"><p class="eyebrow">13 · ENGINEERING INTERPRETATION</p><h2>Meaning of the complete collected system</h2>
+  <h3>Cross-layer observations</h3><ul><li>The host network path uses enP8p1s0 as the default interface via 192.168.4.1.</li><li>ROS 2 uses default on domain 0.</li><li>Seeed Studio reSpeaker XVF3800 4-Mic Array: detected through USB with snd-usb-audio, usb, usbhid; observed state PRESENT_NOT_EXERCISED, and no physical function is inferred.</li><li>Runtime evidence was collected for ROS installation and environment, Docker; this does not by itself prove an end-to-end robot capability.</li></ul>
+  <h3>What cannot yet be concluded</h3><ul><li>Detected physical sensors are not mapped to ROS nodes, topics, or application owners.</li><li>No actuator inventory was collected, so motion and command-path readiness cannot be assessed.</li><li>No ROS node detail was captured; topic and service names cannot be assigned to active process owners.</li><li>The snapshot does not declare the robot mission profile or required components, so optional absence is not treated as failure.</li></ul>
+  <div class="callout"><strong>Passive boundary:</strong> sensor payloads were not judged for quality, actuators were not commanded, and endpoint presence was not treated as proof of successful robot behavior.</div>
+</section>
+<section id="coverage"><p class="eyebrow">14 · BLUEPRINT COMPLETENESS</p><h2>Collected and missing evidence</h2><div class="table-wrap"><table><thead><tr><th>Area</th><th>Coverage</th><th>Snapshot source</th></tr></thead><tbody><tr><td>Host / OS</td><td><span class="state state-collected">COLLECTED</span></td><td>identity, operating_system, platform</td></tr><tr><td>Compute / memory</td><td><span class="state state-collected">COLLECTED</span></td><td>cpu, memory</td></tr><tr><td>Storage</td><td><span class="state state-collected">COLLECTED</span></td><td>storage_devices</td></tr><tr><td>Thermals / power</td><td><span class="state state-collected">COLLECTED</span></td><td>thermal_sensors, power</td></tr><tr><td>Network</td><td><span class="state state-collected">COLLECTED</span></td><td>network</td></tr><tr><td>USB / serial</td><td><span class="state state-collected">COLLECTED</span></td><td>usb_devices, serial_devices</td></tr><tr><td>Robotics software</td><td><span class="state state-collected">COLLECTED</span></td><td>software_stack_inventory</td></tr><tr><td>ROS 2 runtime</td><td><span class="state state-collected">COLLECTED</span></td><td>ros_runtime_inventory</td></tr><tr><td>ROS ↔ hardware mapping</td><td><span class="state state-not-available">NOT AVAILABLE</span></td><td>ros_device_inventory</td></tr></tbody></table></div></section>
+<section class="metadata"><h2>Report provenance</h2><div class="table-wrap"><table><thead><tr><th>Property</th><th>Value</th></tr></thead><tbody><tr><td>Scan ID</td><td>2026-08-11_07-05-13</td></tr><tr><td>Snapshot SHA-256</td><td>b4994d3e47070b69fc210228a126712adf42e7315f3db2f17e764e815e3898ed</td></tr><tr><td>Schema</td><td>3.1</td></tr><tr><td>Screwdriver version</td><td>0.2.1</td></tr><tr><td>Collected</td><td>2026-08-11 07:05:13 PDT</td></tr><tr><td>Collection duration</td><td>Not reported</td></tr><tr><td>Analysis engine</td><td>deterministic analysis</td></tr><tr><td>Focus</td><td>Complete system</td></tr></tbody></table></div></section>
+<section id="evidence"><h2>11. Categorized evidence appendix</h2><p class="muted">Exact source fields used by the reports. Use the browser find function to search within expanded records.</p><h3>Identity and OS</h3><details class="evidence" id="evidence-identity"><summary>identity</summary><pre>{
+  &quot;hostname&quot;: &quot;cutie&quot;,
+  &quot;username&quot;: &quot;phoenix&quot;,
+  &quot;effective_username&quot;: &quot;phoenix&quot;,
+  &quot;uid&quot;: 1000,
+  &quot;gid&quot;: 1000,
+  &quot;groups&quot;: [
+    &quot;adm&quot;,
+    &quot;audio&quot;,
+    &quot;cdrom&quot;,
+    &quot;dip&quot;,
+    &quot;gdm&quot;,
+    &quot;gpio&quot;,
+    &quot;i2c&quot;,
+    &quot;lpadmin&quot;,
+    &quot;ollama&quot;,
+    &quot;phoenix&quot;,
+    &quot;plugdev&quot;,
+    &quot;render&quot;,
+    &quot;sambashare&quot;,
+    &quot;sudo&quot;,
+    &quot;video&quot;,
+    &quot;weston-launch&quot;
+  ],
+  &quot;login_shell&quot;: &quot;/bin/bash&quot;,
+  &quot;machine_id&quot;: &quot;1512b12723e24a6e8a78260bc64035d6&quot;
+}</pre></details><details class="evidence" id="evidence-operating_system"><summary>operating_system</summary><pre>{
+  &quot;distribution&quot;: &quot;Ubuntu 22.04.5 LTS&quot;,
+  &quot;kernel&quot;: &quot;5.15.199-tegra&quot;,
+  &quot;kernel_build&quot;: &quot;#1 SMP PREEMPT Thu Jul 16 11:27:38 PDT 2026&quot;,
+  &quot;architecture&quot;: &quot;aarch64&quot;,
+  &quot;boot_mode&quot;: &quot;UEFI&quot;,
+  &quot;init_system&quot;: &quot;systemd&quot;,
+  &quot;package_manager&quot;: &quot;apt&quot;,
+  &quot;timezone&quot;: &quot;PDT&quot;,
+  &quot;boot_time&quot;: &quot;2026-08-10T18:30:18-07:00&quot;,
+  &quot;uptime_seconds&quot;: 45295.164669036865,
+  &quot;process_count&quot;: 353
+}</pre></details><details class="evidence" id="evidence-platform"><summary>platform</summary><pre>{
+  &quot;manufacturer&quot;: &quot;NVIDIA&quot;,
+  &quot;product_name&quot;: &quot;NVIDIA Jetson Orin Nano Engineering Reference Developer Kit Super&quot;,
+  &quot;board_name&quot;: &quot;Jetson&quot;,
+  &quot;board_version&quot;: &quot;Not Specified&quot;,
+  &quot;firmware_version&quot;: &quot;36.5.2-gcid-46426093&quot;,
+  &quot;serial_number&quot;: &quot;1790426088016&quot;,
+  &quot;machine_type&quot;: &quot;physical computer&quot;,
+  &quot;virtualization&quot;: null,
+  &quot;family&quot;: &quot;nvidia-jetson&quot;,
+  &quot;enrichment_module&quot;: &quot;jetson&quot;,
+  &quot;details&quot;: {
+    &quot;l4t&quot;: &quot;36.5.2&quot;,
+    &quot;power_mode&quot;: &quot;NV Power Mode: MAXN_SUPER | 2&quot;
+  }
+}</pre></details><h3>Compute, storage, thermal and power</h3><details class="evidence" id="evidence-cpu"><summary>cpu</summary><pre>{
+  &quot;model&quot;: &quot;ARMv8 Processor rev 1 (v8l)&quot;,
+  &quot;vendor&quot;: &quot;0x41&quot;,
+  &quot;sockets&quot;: null,
+  &quot;physical_cores&quot;: 6,
+  &quot;logical_cpus&quot;: 6,
+  &quot;online_cpus&quot;: 6,
+  &quot;current_frequency_mhz&quot;: 1228.8,
+  &quot;minimum_frequency_mhz&quot;: 729.6,
+  &quot;maximum_frequency_mhz&quot;: 1728.0,
+  &quot;usage_percent&quot;: 0.0,
+  &quot;load_average&quot;: [
+    0.02978515625,
+    0.01123046875,
+    0.02587890625
+  ],
+  &quot;governor&quot;: &quot;schedutil&quot;,
+  &quot;caches&quot;: {
+    &quot;L1 data&quot;: &quot;384 KiB (6 instances)&quot;,
+    &quot;L1 instruction&quot;: &quot;384 KiB (6 instances)&quot;,
+    &quot;L2&quot;: &quot;1.5 MiB (6 instances)&quot;,
+    &quot;L3&quot;: &quot;4 MiB (2 instances)&quot;
+  }
+}</pre></details><details class="evidence" id="evidence-memory"><summary>memory</summary><pre>{
+  &quot;total_bytes&quot;: 7976845312,
+  &quot;used_bytes&quot;: 4802281472,
+  &quot;available_bytes&quot;: 3174563840,
+  &quot;usage_percent&quot;: 60.2,
+  &quot;shared_bytes&quot;: 15429632,
+  &quot;swap_total_bytes&quot;: 3988414464,
+  &quot;swap_used_bytes&quot;: 1737752576,
+  &quot;swap_free_bytes&quot;: 2250661888,
+  &quot;swap_usage_percent&quot;: 43.6
+}</pre></details><details class="evidence" id="evidence-storage_devices"><summary>storage_devices</summary><pre>[
+  {
+    &quot;name&quot;: &quot;sda&quot;,
+    &quot;path&quot;: &quot;/dev/sda&quot;,
+    &quot;model&quot;: &quot;microcontroller&quot;,
+    &quot;serial_number&quot;: &quot;0665FF575171525067053428&quot;,
+    &quot;connection&quot;: &quot;usb&quot;,
+    &quot;media_type&quot;: &quot;USB HDD&quot;,
+    &quot;capacity_bytes&quot;: 1609728,
+    &quot;firmware_version&quot;: &quot;1.0&quot;,
+    &quot;removable&quot;: true,
+    &quot;read_only&quot;: false,
+    &quot;partitions&quot;: []
+  },
+  {
+    &quot;name&quot;: &quot;zram0&quot;,
+    &quot;path&quot;: &quot;/dev/zram0&quot;,
+    &quot;model&quot;: null,
+    &quot;serial_number&quot;: null,
+    &quot;connection&quot;: null,
+    &quot;media_type&quot;: &quot;SSD/flash&quot;,
+    &quot;capacity_bytes&quot;: 664739840,
+    &quot;firmware_version&quot;: null,
+    &quot;removable&quot;: false,
+    &quot;read_only&quot;: false,
+    &quot;partitions&quot;: []
+  },
+  {
+    &quot;name&quot;: &quot;zram1&quot;,
+    &quot;path&quot;: &quot;/dev/zram1&quot;,
+    &quot;model&quot;: null,
+    &quot;serial_number&quot;: null,
+    &quot;connection&quot;: null,
+    &quot;media_type&quot;: &quot;SSD/flash&quot;,
+    &quot;capacity_bytes&quot;: 664739840,
+    &quot;firmware_version&quot;: null,
+    &quot;removable&quot;: false,
+    &quot;read_only&quot;: false,
+    &quot;partitions&quot;: []
+  },
+  {
+    &quot;name&quot;: &quot;zram2&quot;,
+    &quot;path&quot;: &quot;/dev/zram2&quot;,
+    &quot;model&quot;: null,
+    &quot;serial_number&quot;: null,
+    &quot;connection&quot;: null,
+    &quot;media_type&quot;: &quot;SSD/flash&quot;,
+    &quot;capacity_bytes&quot;: 664739840,
+    &quot;firmware_version&quot;: null,
+    &quot;removable&quot;: false,
+    &quot;read_only&quot;: false,
+    &quot;partitions&quot;: []
+  },
+  {
+    &quot;name&quot;: &quot;zram3&quot;,
+    &quot;path&quot;: &quot;/dev/zram3&quot;,
+    &quot;model&quot;: null,
+    &quot;serial_number&quot;: null,
+    &quot;connection&quot;: null,
+    &quot;media_type&quot;: &quot;SSD/flash&quot;,
+    &quot;capacity_bytes&quot;: 664739840,
+    &quot;firmware_version&quot;: null,
+    &quot;removable&quot;: false,
+    &quot;read_only&quot;: false,
+    &quot;partitions&quot;: []
+  },
+  {
+    &quot;name&quot;: &quot;zram4&quot;,
+    &quot;path&quot;: &quot;/dev/zram4&quot;,
+    &quot;model&quot;: null,
+    &quot;serial_number&quot;: null,
+    &quot;connection&quot;: null,
+    &quot;media_type&quot;: &quot;SSD/flash&quot;,
+    &quot;capacity_bytes&quot;: 664739840,
+    &quot;firmware_version&quot;: null,
+    &quot;removable&quot;: false,
+    &quot;read_only&quot;: false,
+    &quot;partitions&quot;: []
+  },
+  {
+    &quot;name&quot;: &quot;zram5&quot;,
+    &quot;path&quot;: &quot;/dev/zram5&quot;,
+    &quot;model&quot;: null,
+    &quot;serial_number&quot;: null,
+    &quot;connection&quot;: null,
+    &quot;media_type&quot;: &quot;SSD/flash&quot;,
+    &quot;capacity_bytes&quot;: 664739840,
+    &quot;firmware_version&quot;: null,
+    &quot;removable&quot;: false,
+    &quot;read_only&quot;: false,
+    &quot;partitions&quot;: []
+  },
+  {
+    &quot;name&quot;: &quot;nvme0n1&quot;,
+    &quot;path&quot;: &quot;/dev/nvme0n1&quot;,
+    &quot;model&quot;: &quot;WD Green SN3000 500GB&quot;,
+    &quot;serial_number&quot;: &quot;254625801135&quot;,
+    &quot;connection&quot;: &quot;nvme&quot;,
+    &quot;media_type&quot;: &quot;NVMe SSD&quot;,
+    &quot;capacity_bytes&quot;: 500107862016,
+    &quot;firmware_version&quot;: null,
+    &quot;removable&quot;: false,
+    &quot;read_only&quot;: false,
+    &quot;partitions&quot;: [
+      {
+        &quot;path&quot;: &quot;/dev/nvme0n1p1&quot;,
+        &quot;filesystem&quot;: &quot;ext4&quot;,
+        &quot;mount_point&quot;: &quot;/&quot;,
+        &quot;total_bytes&quot;: 489571201024,
+        &quot;used_bytes&quot;: 34030727168,
+        &quot;available_bytes&quot;: 430596386816,
+        &quot;usage_percent&quot;: 7.3,
+        &quot;read_only&quot;: false
+      },
+      {
+        &quot;path&quot;: &quot;/dev/nvme0n1p10&quot;,
+        &quot;filesystem&quot;: &quot;vfat&quot;,
+        &quot;mount_point&quot;: &quot;/boot/efi&quot;,
+        &quot;total_bytes&quot;: 66059264,
+        &quot;used_bytes&quot;: 79872,
+        &quot;available_bytes&quot;: 65979392,
+        &quot;usage_percent&quot;: 0.1,
+        &quot;read_only&quot;: false
+      }
+    ]
+  }
+]</pre></details><details class="evidence" id="evidence-gpus"><summary>gpus</summary><pre>[
+  {
+    &quot;vendor&quot;: &quot;NVIDIA&quot;,
+    &quot;model&quot;: &quot;Orin (nvgpu)&quot;,
+    &quot;driver&quot;: &quot;540.5.0&quot;,
+    &quot;bus_id&quot;: &quot;[N/A]&quot;,
+    &quot;memory_bytes&quot;: null,
+    &quot;usage_percent&quot;: null,
+    &quot;temperature_celsius&quot;: null
+  }
+]</pre></details><details class="evidence" id="evidence-thermal_sensors"><summary>thermal_sensors</summary><pre>[
+  {
+    &quot;name&quot;: &quot;cpu-thermal: sensor 0&quot;,
+    &quot;temperature_celsius&quot;: 50.875,
+    &quot;high_celsius&quot;: 104.5,
+    &quot;critical_celsius&quot;: 104.5
+  },
+  {
+    &quot;name&quot;: &quot;gpu-thermal: sensor 0&quot;,
+    &quot;temperature_celsius&quot;: 51.187,
+    &quot;high_celsius&quot;: 104.5,
+    &quot;critical_celsius&quot;: 104.5
+  },
+  {
+    &quot;name&quot;: &quot;soc0-thermal: sensor 0&quot;,
+    &quot;temperature_celsius&quot;: 50.5,
+    &quot;high_celsius&quot;: 104.5,
+    &quot;critical_celsius&quot;: 104.5
+  },
+  {
+    &quot;name&quot;: &quot;soc1-thermal: sensor 0&quot;,
+    &quot;temperature_celsius&quot;: 51.156,
+    &quot;high_celsius&quot;: 104.5,
+    &quot;critical_celsius&quot;: 104.5
+  },
+  {
+    &quot;name&quot;: &quot;soc2-thermal: sensor 0&quot;,
+    &quot;temperature_celsius&quot;: 49.343,
+    &quot;high_celsius&quot;: 104.5,
+    &quot;critical_celsius&quot;: 104.5
+  },
+  {
+    &quot;name&quot;: &quot;tj-thermal: sensor 0&quot;,
+    &quot;temperature_celsius&quot;: 51.25,
+    &quot;high_celsius&quot;: 0.00010449999999999999,
+    &quot;critical_celsius&quot;: 0.00010449999999999999
+  }
+]</pre></details><details class="evidence" id="evidence-power"><summary>power</summary><pre>{
+  &quot;source&quot;: &quot;external or unknown&quot;,
+  &quot;battery_present&quot;: false,
+  &quot;battery_percent&quot;: null,
+  &quot;charging&quot;: null,
+  &quot;seconds_remaining&quot;: null,
+  &quot;details&quot;: {}
+}</pre></details><h3>Network and Linux devices</h3><details class="evidence" id="evidence-network"><summary>network</summary><pre>{
+  &quot;interfaces&quot;: [
+    {
+      &quot;name&quot;: &quot;lo&quot;,
+      &quot;interface_type&quot;: &quot;loopback&quot;,
+      &quot;ipv4_addresses&quot;: [
+        &quot;127.0.0.1/8&quot;
+      ],
+      &quot;mac_address&quot;: &quot;00:00:00:00:00:00&quot;,
+      &quot;state&quot;: &quot;up&quot;,
+      &quot;mtu&quot;: 65536,
+      &quot;speed_mbps&quot;: null,
+      &quot;duplex&quot;: null,
+      &quot;driver&quot;: null,
+      &quot;is_loopback&quot;: true,
+      &quot;is_virtual&quot;: true,
+      &quot;is_default_route&quot;: false
+    },
+    {
+      &quot;name&quot;: &quot;wlP1p1s0&quot;,
+      &quot;interface_type&quot;: &quot;wifi&quot;,
+      &quot;ipv4_addresses&quot;: [],
+      &quot;mac_address&quot;: &quot;50:2e:91:f3:32:13&quot;,
+      &quot;state&quot;: &quot;down&quot;,
+      &quot;mtu&quot;: 1500,
+      &quot;speed_mbps&quot;: null,
+      &quot;duplex&quot;: null,
+      &quot;driver&quot;: &quot;rtl88x2ce&quot;,
+      &quot;is_loopback&quot;: false,
+      &quot;is_virtual&quot;: false,
+      &quot;is_default_route&quot;: false
+    },
+    {
+      &quot;name&quot;: &quot;can0&quot;,
+      &quot;interface_type&quot;: &quot;ethernet&quot;,
+      &quot;ipv4_addresses&quot;: [],
+      &quot;mac_address&quot;: null,
+      &quot;state&quot;: &quot;down&quot;,
+      &quot;mtu&quot;: 16,
+      &quot;speed_mbps&quot;: null,
+      &quot;duplex&quot;: null,
+      &quot;driver&quot;: &quot;mttcan&quot;,
+      &quot;is_loopback&quot;: false,
+      &quot;is_virtual&quot;: false,
+      &quot;is_default_route&quot;: false
+    },
+    {
+      &quot;name&quot;: &quot;enP8p1s0&quot;,
+      &quot;interface_type&quot;: &quot;ethernet&quot;,
+      &quot;ipv4_addresses&quot;: [
+        &quot;192.168.4.68/22&quot;
+      ],
+      &quot;mac_address&quot;: &quot;ac:3a:e2:7c:15:d4&quot;,
+      &quot;state&quot;: &quot;up&quot;,
+      &quot;mtu&quot;: 1500,
+      &quot;speed_mbps&quot;: 1000,
+      &quot;duplex&quot;: &quot;full&quot;,
+      &quot;driver&quot;: &quot;r8168&quot;,
+      &quot;is_loopback&quot;: false,
+      &quot;is_virtual&quot;: false,
+      &quot;is_default_route&quot;: true
+    },
+    {
+      &quot;name&quot;: &quot;l4tbr0&quot;,
+      &quot;interface_type&quot;: &quot;USB-gadget network&quot;,
+      &quot;ipv4_addresses&quot;: [],
+      &quot;mac_address&quot;: &quot;2a:3e:30:a7:52:ce&quot;,
+      &quot;state&quot;: &quot;down&quot;,
+      &quot;mtu&quot;: 1500,
+      &quot;speed_mbps&quot;: null,
+      &quot;duplex&quot;: null,
+      &quot;driver&quot;: null,
+      &quot;is_loopback&quot;: false,
+      &quot;is_virtual&quot;: true,
+      &quot;is_default_route&quot;: false
+    },
+    {
+      &quot;name&quot;: &quot;usb0&quot;,
+      &quot;interface_type&quot;: &quot;USB-gadget network&quot;,
+      &quot;ipv4_addresses&quot;: [],
+      &quot;mac_address&quot;: &quot;aa:a1:87:c2:01:d1&quot;,
+      &quot;state&quot;: &quot;up&quot;,
+      &quot;mtu&quot;: 1500,
+      &quot;speed_mbps&quot;: null,
+      &quot;duplex&quot;: null,
+      &quot;driver&quot;: null,
+      &quot;is_loopback&quot;: false,
+      &quot;is_virtual&quot;: false,
+      &quot;is_default_route&quot;: false
+    },
+    {
+      &quot;name&quot;: &quot;usb1&quot;,
+      &quot;interface_type&quot;: &quot;USB-gadget network&quot;,
+      &quot;ipv4_addresses&quot;: [],
+      &quot;mac_address&quot;: &quot;aa:a1:87:c2:01:d3&quot;,
+      &quot;state&quot;: &quot;up&quot;,
+      &quot;mtu&quot;: 1500,
+      &quot;speed_mbps&quot;: null,
+      &quot;duplex&quot;: null,
+      &quot;driver&quot;: null,
+      &quot;is_loopback&quot;: false,
+      &quot;is_virtual&quot;: false,
+      &quot;is_default_route&quot;: false
+    },
+    {
+      &quot;name&quot;: &quot;docker0&quot;,
+      &quot;interface_type&quot;: &quot;virtual&quot;,
+      &quot;ipv4_addresses&quot;: [
+        &quot;172.17.0.1/16&quot;
+      ],
+      &quot;mac_address&quot;: &quot;92:a7:62:8b:c5:42&quot;,
+      &quot;state&quot;: &quot;up&quot;,
+      &quot;mtu&quot;: 1500,
+      &quot;speed_mbps&quot;: null,
+      &quot;duplex&quot;: &quot;unknown&quot;,
+      &quot;driver&quot;: null,
+      &quot;is_loopback&quot;: false,
+      &quot;is_virtual&quot;: true,
+      &quot;is_default_route&quot;: false
+    }
+  ],
+  &quot;default_interface&quot;: &quot;enP8p1s0&quot;,
+  &quot;default_gateway&quot;: &quot;192.168.4.1&quot;,
+  &quot;dns_servers&quot;: [
+    &quot;127.0.0.53&quot;
+  ],
+  &quot;internet_route_available&quot;: true
+}</pre></details><details class="evidence" id="evidence-usb_devices"><summary>usb_devices</summary><pre>[
+  {
+    &quot;sysfs_name&quot;: &quot;usb1&quot;,
+    &quot;usb_id&quot;: &quot;1d6b:0002&quot;,
+    &quot;vendor_id&quot;: &quot;1d6b&quot;,
+    &quot;product_id&quot;: &quot;0002&quot;,
+    &quot;manufacturer&quot;: &quot;Linux 5.15.199-tegra xhci-hcd&quot;,
+    &quot;product_name&quot;: &quot;xHCI Host Controller&quot;,
+    &quot;display_name&quot;: &quot;Linux 5.15.199-tegra xhci-hcd xHCI Host Controller&quot;,
+    &quot;serial_number&quot;: &quot;3610000.usb&quot;,
+    &quot;bus_number&quot;: 1,
+    &quot;device_number&quot;: 1,
+    &quot;usb_version&quot;: &quot;2.00&quot;,
+    &quot;speed_mbps&quot;: 480.0,
+    &quot;device_class&quot;: &quot;09&quot;,
+    &quot;device_class_name&quot;: &quot;hub&quot;,
+    &quot;drivers&quot;: [
+      &quot;usb&quot;
+    ],
+    &quot;device_nodes&quot;: [
+      {
+        &quot;path&quot;: &quot;/dev/bus/usb/001/001&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw-r--&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;root&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;read-only&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/char/189:0&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw-r--&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;root&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;read-only&quot;
+      }
+    ]
+  },
+  {
+    &quot;sysfs_name&quot;: &quot;1-2&quot;,
+    &quot;usb_id&quot;: &quot;0bda:5489&quot;,
+    &quot;vendor_id&quot;: &quot;0bda&quot;,
+    &quot;product_id&quot;: &quot;5489&quot;,
+    &quot;manufacturer&quot;: &quot;Generic&quot;,
+    &quot;product_name&quot;: &quot;4-Port USB 2.0 Hub&quot;,
+    &quot;display_name&quot;: &quot;Generic 4-Port USB 2.0 Hub&quot;,
+    &quot;serial_number&quot;: null,
+    &quot;bus_number&quot;: 1,
+    &quot;device_number&quot;: 2,
+    &quot;usb_version&quot;: &quot;2.10&quot;,
+    &quot;speed_mbps&quot;: 480.0,
+    &quot;device_class&quot;: &quot;09&quot;,
+    &quot;device_class_name&quot;: &quot;hub&quot;,
+    &quot;drivers&quot;: [
+      &quot;hub&quot;,
+      &quot;usb&quot;
+    ],
+    &quot;device_nodes&quot;: [
+      {
+        &quot;path&quot;: &quot;/dev/bus/usb/001/002&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw-r--&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;root&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;read-only&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/char/189:1&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw-r--&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;root&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;read-only&quot;
+      }
+    ]
+  },
+  {
+    &quot;sysfs_name&quot;: &quot;1-3&quot;,
+    &quot;usb_id&quot;: &quot;13d3:3549&quot;,
+    &quot;vendor_id&quot;: &quot;13d3&quot;,
+    &quot;product_id&quot;: &quot;3549&quot;,
+    &quot;manufacturer&quot;: &quot;Realtek&quot;,
+    &quot;product_name&quot;: &quot;Bluetooth Radio&quot;,
+    &quot;display_name&quot;: &quot;Realtek Bluetooth Radio&quot;,
+    &quot;serial_number&quot;: &quot;00e04c000001&quot;,
+    &quot;bus_number&quot;: 1,
+    &quot;device_number&quot;: 3,
+    &quot;usb_version&quot;: &quot;1.00&quot;,
+    &quot;speed_mbps&quot;: 12.0,
+    &quot;device_class&quot;: &quot;e0&quot;,
+    &quot;device_class_name&quot;: &quot;wireless controller&quot;,
+    &quot;drivers&quot;: [
+      &quot;rtk_btusb&quot;,
+      &quot;usb&quot;
+    ],
+    &quot;device_nodes&quot;: [
+      {
+        &quot;path&quot;: &quot;/dev/bus/usb/001/003&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw-r--&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;root&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;read-only&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/char/189:2&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw-r--&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;root&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;read-only&quot;
+      }
+    ]
+  },
+  {
+    &quot;sysfs_name&quot;: &quot;1-2.1&quot;,
+    &quot;usb_id&quot;: &quot;0483:374b&quot;,
+    &quot;vendor_id&quot;: &quot;0483&quot;,
+    &quot;product_id&quot;: &quot;374b&quot;,
+    &quot;manufacturer&quot;: &quot;STMicroelectronics&quot;,
+    &quot;product_name&quot;: &quot;STM32 STLink&quot;,
+    &quot;display_name&quot;: &quot;STMicroelectronics STM32 STLink&quot;,
+    &quot;serial_number&quot;: &quot;0665FF575171525067053428&quot;,
+    &quot;bus_number&quot;: 1,
+    &quot;device_number&quot;: 4,
+    &quot;usb_version&quot;: &quot;2.00&quot;,
+    &quot;speed_mbps&quot;: 12.0,
+    &quot;device_class&quot;: &quot;ef&quot;,
+    &quot;device_class_name&quot;: &quot;miscellaneous&quot;,
+    &quot;drivers&quot;: [
+      &quot;cdc_acm&quot;,
+      &quot;usb&quot;,
+      &quot;usb-storage&quot;
+    ],
+    &quot;device_nodes&quot;: [
+      {
+        &quot;path&quot;: &quot;/dev/block/8:0&quot;,
+        &quot;node_type&quot;: &quot;block&quot;,
+        &quot;permissions&quot;: &quot;brw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;disk&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/bsg/0:0:0:0&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-------&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;root&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/bus/usb/001/004&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;plugdev&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: true,
+        &quot;access&quot;: &quot;read-write&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/char/166:0&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;plugdev&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: true,
+        &quot;access&quot;: &quot;read-write&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/char/189:3&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;plugdev&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: true,
+        &quot;access&quot;: &quot;read-write&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/char/245:0&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-------&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;root&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/disk/by-id/usb-MBED_microcontroller_0665FF575171525067053428-0:0&quot;,
+        &quot;node_type&quot;: &quot;block&quot;,
+        &quot;permissions&quot;: &quot;brw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;disk&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/disk/by-label/NOD_F446RE&quot;,
+        &quot;node_type&quot;: &quot;block&quot;,
+        &quot;permissions&quot;: &quot;brw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;disk&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/disk/by-path/platform-3610000.usb-usb-0:2.1:1.1-scsi-0:0:0:0&quot;,
+        &quot;node_type&quot;: &quot;block&quot;,
+        &quot;permissions&quot;: &quot;brw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;disk&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/disk/by-uuid/2702-1974&quot;,
+        &quot;node_type&quot;: &quot;block&quot;,
+        &quot;permissions&quot;: &quot;brw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;disk&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/sda&quot;,
+        &quot;node_type&quot;: &quot;block&quot;,
+        &quot;permissions&quot;: &quot;brw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;disk&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/serial/by-id/usb-STMicroelectronics_STM32_STLink_0665FF575171525067053428-if02&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;plugdev&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: true,
+        &quot;access&quot;: &quot;read-write&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/serial/by-path/platform-3610000.usb-usb-0:2.1:1.2&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;plugdev&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: true,
+        &quot;access&quot;: &quot;read-write&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/ttyACM0&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;plugdev&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: true,
+        &quot;access&quot;: &quot;read-write&quot;
+      }
+    ]
+  },
+  {
+    &quot;sysfs_name&quot;: &quot;1-2.4&quot;,
+    &quot;usb_id&quot;: &quot;10c4:ea60&quot;,
+    &quot;vendor_id&quot;: &quot;10c4&quot;,
+    &quot;product_id&quot;: &quot;ea60&quot;,
+    &quot;manufacturer&quot;: &quot;Silicon Labs&quot;,
+    &quot;product_name&quot;: &quot;CP2102N USB to UART Bridge Controller&quot;,
+    &quot;display_name&quot;: &quot;Silicon Labs CP2102N USB to UART Bridge Controller&quot;,
+    &quot;serial_number&quot;: &quot;720a07b73a70f0118fdd8a301045c30f&quot;,
+    &quot;bus_number&quot;: 1,
+    &quot;device_number&quot;: 6,
+    &quot;usb_version&quot;: &quot;2.00&quot;,
+    &quot;speed_mbps&quot;: 12.0,
+    &quot;device_class&quot;: &quot;00&quot;,
+    &quot;device_class_name&quot;: &quot;defined at interface level&quot;,
+    &quot;drivers&quot;: [
+      &quot;cp210x&quot;,
+      &quot;usb&quot;
+    ],
+    &quot;device_nodes&quot;: [
+      {
+        &quot;path&quot;: &quot;/dev/bus/usb/001/006&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw-r--&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;root&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;read-only&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/char/188:0&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;dialout&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/char/189:5&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw-r--&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;root&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;read-only&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/char/254:2&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;plugdev&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: true,
+        &quot;access&quot;: &quot;read-write&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/gpiochip2&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;plugdev&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: true,
+        &quot;access&quot;: &quot;read-write&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/serial/by-id/usb-Silicon_Labs_CP2102N_USB_to_UART_Bridge_Controller_720a07b73a70f0118fdd8a301045c30f-if00-port0&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;dialout&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/serial/by-path/platform-3610000.usb-usb-0:2.4:1.0-port0&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;dialout&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/ttyUSB0&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;dialout&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      }
+    ]
+  },
+  {
+    &quot;sysfs_name&quot;: &quot;1-1&quot;,
+    &quot;usb_id&quot;: &quot;2886:001a&quot;,
+    &quot;vendor_id&quot;: &quot;2886&quot;,
+    &quot;product_id&quot;: &quot;001a&quot;,
+    &quot;manufacturer&quot;: &quot;Seeed Studio&quot;,
+    &quot;product_name&quot;: &quot;reSpeaker XVF3800 4-Mic Array&quot;,
+    &quot;display_name&quot;: &quot;Seeed Studio reSpeaker XVF3800 4-Mic Array&quot;,
+    &quot;serial_number&quot;: &quot;101991441261600088&quot;,
+    &quot;bus_number&quot;: 1,
+    &quot;device_number&quot;: 7,
+    &quot;usb_version&quot;: &quot;2.01&quot;,
+    &quot;speed_mbps&quot;: 480.0,
+    &quot;device_class&quot;: &quot;ef&quot;,
+    &quot;device_class_name&quot;: &quot;miscellaneous&quot;,
+    &quot;drivers&quot;: [
+      &quot;snd-usb-audio&quot;,
+      &quot;usb&quot;,
+      &quot;usbhid&quot;
+    ],
+    &quot;device_nodes&quot;: [
+      {
+        &quot;path&quot;: &quot;/dev/bus/usb/001/007&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw-r--&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;root&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;read-only&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/char/116:50&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;audio&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: true,
+        &quot;access&quot;: &quot;read-write&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/char/116:51&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;audio&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: true,
+        &quot;access&quot;: &quot;read-write&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/char/116:52&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;audio&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: true,
+        &quot;access&quot;: &quot;read-write&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/char/13:70&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;input&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/char/13:71&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;input&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/char/13:72&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;input&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/char/189:6&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw-r--&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;root&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;read-only&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/char/510:1&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-------&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;root&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/hidraw1&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-------&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;root&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/input/by-id/usb-Seeed_Studio_reSpeaker_XVF3800_4-Mic_Array_101991441261600088-event-if05&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;input&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/input/by-path/platform-3610000.usb-usb-0:1:1.5-event&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;input&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/input/event6&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;input&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/input/event7&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;input&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/input/event8&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;input&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/snd/by-id/usb-Seeed_Studio_reSpeaker_XVF3800_4-Mic_Array_101991441261600088-00&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;audio&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: true,
+        &quot;access&quot;: &quot;read-write&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/snd/by-path/platform-3610000.usb-usb-0:1:1.0&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;audio&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: true,
+        &quot;access&quot;: &quot;read-write&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/snd/controlC2&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;audio&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: true,
+        &quot;access&quot;: &quot;read-write&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/snd/pcmC2D0c&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;audio&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: true,
+        &quot;access&quot;: &quot;read-write&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/snd/pcmC2D0p&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;audio&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: true,
+        &quot;access&quot;: &quot;read-write&quot;
+      }
+    ]
+  },
+  {
+    &quot;sysfs_name&quot;: &quot;1-2.2&quot;,
+    &quot;usb_id&quot;: &quot;0484:5750&quot;,
+    &quot;vendor_id&quot;: &quot;0484&quot;,
+    &quot;product_id&quot;: &quot;5750&quot;,
+    &quot;manufacturer&quot;: &quot;QDtech&quot;,
+    &quot;product_name&quot;: &quot;MPI5001&quot;,
+    &quot;display_name&quot;: &quot;QDtech MPI5001&quot;,
+    &quot;serial_number&quot;: &quot;MPI5001അЉơƅ∉ʡ䈉&quot;,
+    &quot;bus_number&quot;: 1,
+    &quot;device_number&quot;: 8,
+    &quot;usb_version&quot;: &quot;0.01&quot;,
+    &quot;speed_mbps&quot;: 12.0,
+    &quot;device_class&quot;: &quot;00&quot;,
+    &quot;device_class_name&quot;: &quot;defined at interface level&quot;,
+    &quot;drivers&quot;: [
+      &quot;usb&quot;,
+      &quot;usbhid&quot;
+    ],
+    &quot;device_nodes&quot;: [
+      {
+        &quot;path&quot;: &quot;/dev/bus/usb/001/008&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw-r--&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;root&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;read-only&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/char/13:65&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;input&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/char/189:7&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw-r--&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;root&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;read-only&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/char/510:0&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-------&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;root&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/hidraw0&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-------&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;root&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/input/by-id/usb-QDtech_MPI5001-event-if00&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;input&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/input/by-path/platform-3610000.usb-usb-0:2.2:1.0-event&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;input&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/input/event1&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw----&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;input&quot;,
+        &quot;readable&quot;: false,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;denied&quot;
+      }
+    ]
+  },
+  {
+    &quot;sysfs_name&quot;: &quot;usb2&quot;,
+    &quot;usb_id&quot;: &quot;1d6b:0003&quot;,
+    &quot;vendor_id&quot;: &quot;1d6b&quot;,
+    &quot;product_id&quot;: &quot;0003&quot;,
+    &quot;manufacturer&quot;: &quot;Linux 5.15.199-tegra xhci-hcd&quot;,
+    &quot;product_name&quot;: &quot;xHCI Host Controller&quot;,
+    &quot;display_name&quot;: &quot;Linux 5.15.199-tegra xhci-hcd xHCI Host Controller&quot;,
+    &quot;serial_number&quot;: &quot;3610000.usb&quot;,
+    &quot;bus_number&quot;: 2,
+    &quot;device_number&quot;: 1,
+    &quot;usb_version&quot;: &quot;3.10&quot;,
+    &quot;speed_mbps&quot;: 10000.0,
+    &quot;device_class&quot;: &quot;09&quot;,
+    &quot;device_class_name&quot;: &quot;hub&quot;,
+    &quot;drivers&quot;: [
+      &quot;usb&quot;
+    ],
+    &quot;device_nodes&quot;: [
+      {
+        &quot;path&quot;: &quot;/dev/bus/usb/002/001&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw-r--&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;root&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;read-only&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/char/189:128&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw-r--&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;root&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;read-only&quot;
+      }
+    ]
+  },
+  {
+    &quot;sysfs_name&quot;: &quot;2-1&quot;,
+    &quot;usb_id&quot;: &quot;0bda:0489&quot;,
+    &quot;vendor_id&quot;: &quot;0bda&quot;,
+    &quot;product_id&quot;: &quot;0489&quot;,
+    &quot;manufacturer&quot;: &quot;Generic&quot;,
+    &quot;product_name&quot;: &quot;4-Port USB 3.0 Hub&quot;,
+    &quot;display_name&quot;: &quot;Generic 4-Port USB 3.0 Hub&quot;,
+    &quot;serial_number&quot;: null,
+    &quot;bus_number&quot;: 2,
+    &quot;device_number&quot;: 2,
+    &quot;usb_version&quot;: &quot;3.20&quot;,
+    &quot;speed_mbps&quot;: 10000.0,
+    &quot;device_class&quot;: &quot;09&quot;,
+    &quot;device_class_name&quot;: &quot;hub&quot;,
+    &quot;drivers&quot;: [
+      &quot;hub&quot;,
+      &quot;usb&quot;
+    ],
+    &quot;device_nodes&quot;: [
+      {
+        &quot;path&quot;: &quot;/dev/bus/usb/002/002&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw-r--&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;root&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;read-only&quot;
+      },
+      {
+        &quot;path&quot;: &quot;/dev/char/189:129&quot;,
+        &quot;node_type&quot;: &quot;character&quot;,
+        &quot;permissions&quot;: &quot;crw-rw-r--&quot;,
+        &quot;owner&quot;: &quot;root&quot;,
+        &quot;group&quot;: &quot;root&quot;,
+        &quot;readable&quot;: true,
+        &quot;writable&quot;: false,
+        &quot;access&quot;: &quot;read-only&quot;
+      }
+    ]
+  }
+]</pre></details><details class="evidence" id="evidence-serial_devices"><summary>serial_devices</summary><pre>[
+  {
+    &quot;port&quot;: &quot;/dev/ttyACM0&quot;,
+    &quot;sysfs_name&quot;: &quot;ttyACM0&quot;,
+    &quot;transport&quot;: &quot;usb-cdc-acm&quot;,
+    &quot;driver&quot;: &quot;cdc_acm&quot;,
+    &quot;stable_id_path&quot;: &quot;/dev/serial/by-id/usb-STMicroelectronics_STM32_STLink_0665FF575171525067053428-if02&quot;,
+    &quot;physical_path&quot;: &quot;/dev/serial/by-path/platform-3610000.usb-usb-0:2.1:1.2&quot;,
+    &quot;stable_path_available&quot;: true,
+    &quot;usb_id&quot;: &quot;0483:374b&quot;,
+    &quot;usb_vendor_id&quot;: &quot;0483&quot;,
+    &quot;usb_product_id&quot;: &quot;374b&quot;,
+    &quot;manufacturer&quot;: &quot;STMicroelectronics&quot;,
+    &quot;product_name&quot;: &quot;STM32 STLink&quot;,
+    &quot;display_name&quot;: &quot;STMicroelectronics STM32 STLink&quot;,
+    &quot;serial_number&quot;: &quot;0665FF575171525067053428&quot;,
+    &quot;device_node&quot;: {
+      &quot;path&quot;: &quot;/dev/ttyACM0&quot;,
+      &quot;node_type&quot;: &quot;character&quot;,
+      &quot;permissions&quot;: &quot;crw-rw----&quot;,
+      &quot;owner&quot;: &quot;root&quot;,
+      &quot;group&quot;: &quot;plugdev&quot;,
+      &quot;readable&quot;: true,
+      &quot;writable&quot;: true,
+      &quot;access&quot;: &quot;read-write&quot;
+    }
+  },
+  {
+    &quot;port&quot;: &quot;/dev/ttyAMA0&quot;,
+    &quot;sysfs_name&quot;: &quot;ttyAMA0&quot;,
+    &quot;transport&quot;: &quot;onboard-uart&quot;,
+    &quot;driver&quot;: &quot;sbsa-uart&quot;,
+    &quot;stable_id_path&quot;: null,
+    &quot;physical_path&quot;: null,
+    &quot;stable_path_available&quot;: false,
+    &quot;usb_id&quot;: null,
+    &quot;usb_vendor_id&quot;: null,
+    &quot;usb_product_id&quot;: null,
+    &quot;manufacturer&quot;: null,
+    &quot;product_name&quot;: null,
+    &quot;display_name&quot;: &quot;ttyAMA0&quot;,
+    &quot;serial_number&quot;: null,
+    &quot;device_node&quot;: {
+      &quot;path&quot;: &quot;/dev/ttyAMA0&quot;,
+      &quot;node_type&quot;: &quot;character&quot;,
+      &quot;permissions&quot;: &quot;crw-rw----&quot;,
+      &quot;owner&quot;: &quot;root&quot;,
+      &quot;group&quot;: &quot;dialout&quot;,
+      &quot;readable&quot;: false,
+      &quot;writable&quot;: false,
+      &quot;access&quot;: &quot;denied&quot;
+    }
+  },
+  {
+    &quot;port&quot;: &quot;/dev/ttyS0&quot;,
+    &quot;sysfs_name&quot;: &quot;ttyS0&quot;,
+    &quot;transport&quot;: &quot;onboard-uart&quot;,
+    &quot;driver&quot;: &quot;serial8250&quot;,
+    &quot;stable_id_path&quot;: null,
+    &quot;physical_path&quot;: null,
+    &quot;stable_path_available&quot;: false,
+    &quot;usb_id&quot;: null,
+    &quot;usb_vendor_id&quot;: null,
+    &quot;usb_product_id&quot;: null,
+    &quot;manufacturer&quot;: null,
+    &quot;product_name&quot;: null,
+    &quot;display_name&quot;: &quot;ttyS0&quot;,
+    &quot;serial_number&quot;: null,
+    &quot;device_node&quot;: {
+      &quot;path&quot;: &quot;/dev/ttyS0&quot;,
+      &quot;node_type&quot;: &quot;character&quot;,
+      &quot;permissions&quot;: &quot;crw-rw----&quot;,
+      &quot;owner&quot;: &quot;root&quot;,
+      &quot;group&quot;: &quot;dialout&quot;,
+      &quot;readable&quot;: false,
+      &quot;writable&quot;: false,
+      &quot;access&quot;: &quot;denied&quot;
+    }
+  },
+  {
+    &quot;port&quot;: &quot;/dev/ttyS1&quot;,
+    &quot;sysfs_name&quot;: &quot;ttyS1&quot;,
+    &quot;transport&quot;: &quot;onboard-uart&quot;,
+    &quot;driver&quot;: &quot;serial8250&quot;,
+    &quot;stable_id_path&quot;: null,
+    &quot;physical_path&quot;: null,
+    &quot;stable_path_available&quot;: false,
+    &quot;usb_id&quot;: null,
+    &quot;usb_vendor_id&quot;: null,
+    &quot;usb_product_id&quot;: null,
+    &quot;manufacturer&quot;: null,
+    &quot;product_name&quot;: null,
+    &quot;display_name&quot;: &quot;ttyS1&quot;,
+    &quot;serial_number&quot;: null,
+    &quot;device_node&quot;: {
+      &quot;path&quot;: &quot;/dev/ttyS1&quot;,
+      &quot;node_type&quot;: &quot;character&quot;,
+      &quot;permissions&quot;: &quot;crw-rw----&quot;,
+      &quot;owner&quot;: &quot;root&quot;,
+      &quot;group&quot;: &quot;dialout&quot;,
+      &quot;readable&quot;: false,
+      &quot;writable&quot;: false,
+      &quot;access&quot;: &quot;denied&quot;
+    }
+  },
+  {
+    &quot;port&quot;: &quot;/dev/ttyS2&quot;,
+    &quot;sysfs_name&quot;: &quot;ttyS2&quot;,
+    &quot;transport&quot;: &quot;onboard-uart&quot;,
+    &quot;driver&quot;: &quot;serial8250&quot;,
+    &quot;stable_id_path&quot;: null,
+    &quot;physical_path&quot;: null,
+    &quot;stable_path_available&quot;: false,
+    &quot;usb_id&quot;: null,
+    &quot;usb_vendor_id&quot;: null,
+    &quot;usb_product_id&quot;: null,
+    &quot;manufacturer&quot;: null,
+    &quot;product_name&quot;: null,
+    &quot;display_name&quot;: &quot;ttyS2&quot;,
+    &quot;serial_number&quot;: null,
+    &quot;device_node&quot;: {
+      &quot;path&quot;: &quot;/dev/ttyS2&quot;,
+      &quot;node_type&quot;: &quot;character&quot;,
+      &quot;permissions&quot;: &quot;crw-rw----&quot;,
+      &quot;owner&quot;: &quot;root&quot;,
+      &quot;group&quot;: &quot;dialout&quot;,
+      &quot;readable&quot;: false,
+      &quot;writable&quot;: false,
+      &quot;access&quot;: &quot;denied&quot;
+    }
+  },
+  {
+    &quot;port&quot;: &quot;/dev/ttyS3&quot;,
+    &quot;sysfs_name&quot;: &quot;ttyS3&quot;,
+    &quot;transport&quot;: &quot;onboard-uart&quot;,
+    &quot;driver&quot;: &quot;serial8250&quot;,
+    &quot;stable_id_path&quot;: null,
+    &quot;physical_path&quot;: null,
+    &quot;stable_path_available&quot;: false,
+    &quot;usb_id&quot;: null,
+    &quot;usb_vendor_id&quot;: null,
+    &quot;usb_product_id&quot;: null,
+    &quot;manufacturer&quot;: null,
+    &quot;product_name&quot;: null,
+    &quot;display_name&quot;: &quot;ttyS3&quot;,
+    &quot;serial_number&quot;: null,
+    &quot;device_node&quot;: {
+      &quot;path&quot;: &quot;/dev/ttyS3&quot;,
+      &quot;node_type&quot;: &quot;character&quot;,
+      &quot;permissions&quot;: &quot;crw-rw----&quot;,
+      &quot;owner&quot;: &quot;root&quot;,
+      &quot;group&quot;: &quot;dialout&quot;,
+      &quot;readable&quot;: false,
+      &quot;writable&quot;: false,
+      &quot;access&quot;: &quot;denied&quot;
+    }
+  },
+  {
+    &quot;port&quot;: &quot;/dev/ttyTHS1&quot;,
+    &quot;sysfs_name&quot;: &quot;ttyTHS1&quot;,
+    &quot;transport&quot;: &quot;onboard-uart&quot;,
+    &quot;driver&quot;: &quot;serial-tegra&quot;,
+    &quot;stable_id_path&quot;: null,
+    &quot;physical_path&quot;: null,
+    &quot;stable_path_available&quot;: false,
+    &quot;usb_id&quot;: null,
+    &quot;usb_vendor_id&quot;: null,
+    &quot;usb_product_id&quot;: null,
+    &quot;manufacturer&quot;: null,
+    &quot;product_name&quot;: null,
+    &quot;display_name&quot;: &quot;ttyTHS1&quot;,
+    &quot;serial_number&quot;: null,
+    &quot;device_node&quot;: {
+      &quot;path&quot;: &quot;/dev/ttyTHS1&quot;,
+      &quot;node_type&quot;: &quot;character&quot;,
+      &quot;permissions&quot;: &quot;crw-rw----&quot;,
+      &quot;owner&quot;: &quot;root&quot;,
+      &quot;group&quot;: &quot;dialout&quot;,
+      &quot;readable&quot;: false,
+      &quot;writable&quot;: false,
+      &quot;access&quot;: &quot;denied&quot;
+    }
+  },
+  {
+    &quot;port&quot;: &quot;/dev/ttyTHS2&quot;,
+    &quot;sysfs_name&quot;: &quot;ttyTHS2&quot;,
+    &quot;transport&quot;: &quot;onboard-uart&quot;,
+    &quot;driver&quot;: &quot;serial-tegra&quot;,
+    &quot;stable_id_path&quot;: null,
+    &quot;physical_path&quot;: null,
+    &quot;stable_path_available&quot;: false,
+    &quot;usb_id&quot;: null,
+    &quot;usb_vendor_id&quot;: null,
+    &quot;usb_product_id&quot;: null,
+    &quot;manufacturer&quot;: null,
+    &quot;product_name&quot;: null,
+    &quot;display_name&quot;: &quot;ttyTHS2&quot;,
+    &quot;serial_number&quot;: null,
+    &quot;device_node&quot;: {
+      &quot;path&quot;: &quot;/dev/ttyTHS2&quot;,
+      &quot;node_type&quot;: &quot;character&quot;,
+      &quot;permissions&quot;: &quot;crw-rw----&quot;,
+      &quot;owner&quot;: &quot;root&quot;,
+      &quot;group&quot;: &quot;dialout&quot;,
+      &quot;readable&quot;: false,
+      &quot;writable&quot;: false,
+      &quot;access&quot;: &quot;denied&quot;
+    }
+  },
+  {
+    &quot;port&quot;: &quot;/dev/ttyUSB0&quot;,
+    &quot;sysfs_name&quot;: &quot;ttyUSB0&quot;,
+    &quot;transport&quot;: &quot;usb-serial&quot;,
+    &quot;driver&quot;: &quot;cp210x&quot;,
+    &quot;stable_id_path&quot;: &quot;/dev/serial/by-id/usb-Silicon_Labs_CP2102N_USB_to_UART_Bridge_Controller_720a07b73a70f0118fdd8a301045c30f-if00-port0&quot;,
+    &quot;physical_path&quot;: &quot;/dev/serial/by-path/platform-3610000.usb-usb-0:2.4:1.0-port0&quot;,
+    &quot;stable_path_available&quot;: true,
+    &quot;usb_id&quot;: &quot;10c4:ea60&quot;,
+    &quot;usb_vendor_id&quot;: &quot;10c4&quot;,
+    &quot;usb_product_id&quot;: &quot;ea60&quot;,
+    &quot;manufacturer&quot;: &quot;Silicon Labs&quot;,
+    &quot;product_name&quot;: &quot;CP2102N USB to UART Bridge Controller&quot;,
+    &quot;display_name&quot;: &quot;Silicon Labs CP2102N USB to UART Bridge Controller&quot;,
+    &quot;serial_number&quot;: &quot;720a07b73a70f0118fdd8a301045c30f&quot;,
+    &quot;device_node&quot;: {
+      &quot;path&quot;: &quot;/dev/ttyUSB0&quot;,
+      &quot;node_type&quot;: &quot;character&quot;,
+      &quot;permissions&quot;: &quot;crw-rw----&quot;,
+      &quot;owner&quot;: &quot;root&quot;,
+      &quot;group&quot;: &quot;dialout&quot;,
+      &quot;readable&quot;: false,
+      &quot;writable&quot;: false,
+      &quot;access&quot;: &quot;denied&quot;
+    }
+  }
+]</pre></details><h3>Robotics and ROS</h3><details class="evidence" id="evidence-software_stack_inventory"><summary>software_stack_inventory</summary><pre>[
+  {
+    &quot;category&quot;: &quot;software stack&quot;,
+    &quot;name&quot;: &quot;ROS installation and environment&quot;,
+    &quot;status&quot;: &quot;warning&quot;,
+    &quot;details&quot;: {
+      &quot;detected&quot;: true,
+      &quot;environment_sourced&quot;: false,
+      &quot;ros_version&quot;: null,
+      &quot;active_distribution&quot;: null,
+      &quot;installed_distributions&quot;: &quot;humble&quot;,
+      &quot;ros2_executable&quot;: null,
+      &quot;roscore_executable&quot;: null,
+      &quot;ros_domain_id&quot;: 0,
+      &quot;ros_localhost_only&quot;: null,
+      &quot;rmw_implementation&quot;: null,
+      &quot;indexed_package_count&quot;: 197,
+      &quot;prefix_paths&quot;: null,
+      &quot;workspaces&quot;: null,
+      &quot;dds_configuration&quot;: null,
+      &quot;installed&quot;: true,
+      &quot;running&quot;: true,
+      &quot;state&quot;: &quot;RUNNING&quot;,
+      &quot;original_category&quot;: &quot;ROS environment&quot;
+    }
+  },
+  {
+    &quot;category&quot;: &quot;software stack&quot;,
+    &quot;name&quot;: &quot;Robot State Publisher&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;installed&quot;: true,
+      &quot;detected_packages&quot;: &quot;robot_state_publisher&quot;,
+      &quot;package_candidates&quot;: &quot;robot_state_publisher&quot;,
+      &quot;optional&quot;: true,
+      &quot;running&quot;: false,
+      &quot;state&quot;: &quot;INSTALLED&quot;,
+      &quot;original_category&quot;: &quot;robotics stack&quot;
+    }
+  },
+  {
+    &quot;category&quot;: &quot;software stack&quot;,
+    &quot;name&quot;: &quot;colcon&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;installed&quot;: true,
+      &quot;executable&quot;: &quot;/usr/bin/colcon&quot;,
+      &quot;running&quot;: false,
+      &quot;state&quot;: &quot;INSTALLED&quot;,
+      &quot;original_category&quot;: &quot;build tool&quot;
+    }
+  },
+  {
+    &quot;category&quot;: &quot;software stack&quot;,
+    &quot;name&quot;: &quot;rosdep&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;installed&quot;: true,
+      &quot;executable&quot;: &quot;/usr/bin/rosdep&quot;,
+      &quot;running&quot;: false,
+      &quot;state&quot;: &quot;INSTALLED&quot;,
+      &quot;original_category&quot;: &quot;dependency tool&quot;
+    }
+  },
+  {
+    &quot;category&quot;: &quot;software stack&quot;,
+    &quot;name&quot;: &quot;vcstool&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;installed&quot;: true,
+      &quot;executable&quot;: &quot;/usr/bin/vcs&quot;,
+      &quot;running&quot;: false,
+      &quot;state&quot;: &quot;INSTALLED&quot;,
+      &quot;original_category&quot;: &quot;source-management tool&quot;
+    }
+  },
+  {
+    &quot;category&quot;: &quot;software stack&quot;,
+    &quot;name&quot;: &quot;Docker&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;installed&quot;: true,
+      &quot;executable&quot;: &quot;/usr/bin/docker&quot;,
+      &quot;running&quot;: true,
+      &quot;state&quot;: &quot;RUNNING&quot;,
+      &quot;original_category&quot;: &quot;container runtime&quot;
+    }
+  },
+  {
+    &quot;category&quot;: &quot;software stack&quot;,
+    &quot;name&quot;: &quot;CUDA Toolkit&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;installed&quot;: true,
+      &quot;executable&quot;: null,
+      &quot;toolkit_root&quot;: &quot;/usr/local/cuda&quot;,
+      &quot;running&quot;: false,
+      &quot;state&quot;: &quot;INSTALLED&quot;,
+      &quot;original_category&quot;: &quot;compute library&quot;
+    }
+  }
+]</pre></details><details class="evidence" id="evidence-sensor_inventory"><summary>sensor_inventory</summary><pre>[
+  {
+    &quot;category&quot;: &quot;sensor&quot;,
+    &quot;name&quot;: &quot;Seeed Studio reSpeaker XVF3800 4-Mic Array&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;kind&quot;: &quot;microphone&quot;,
+      &quot;source&quot;: &quot;Linux USB/sysfs&quot;,
+      &quot;bus&quot;: &quot;USB&quot;,
+      &quot;protocol&quot;: &quot;USB Audio Class&quot;,
+      &quot;channel&quot;: &quot;/dev/bus/usb/001/007, /dev/char/116:50, /dev/char/116:51, /dev/char/116:52, /dev/char/13:70, /dev/char/13:71, /dev/char/13:72, /dev/char/189:6, /dev/char/510:1, /dev/hidraw1, /dev/input/by-id/usb-Seeed_Studio_reSpeaker_XVF3800_4-Mic_Array_101991441261600088-event-if05, /dev/input/by-path/platform-3610000.usb-usb-0:1:1.5-event, /dev/input/event6, /dev/input/event7, /dev/input/event8, /dev/snd/by-id/usb-Seeed_Studio_reSpeaker_XVF3800_4-Mic_Array_101991441261600088-00, /dev/snd/by-path/platform-3610000.usb-usb-0:1:1.0, /dev/snd/controlC2, /dev/snd/pcmC2D0c, /dev/snd/pcmC2D0p&quot;,
+      &quot;usb_id&quot;: &quot;2886:001a&quot;,
+      &quot;driver&quot;: &quot;snd-usb-audio, usb, usbhid&quot;,
+      &quot;state&quot;: &quot;DETECTED&quot;,
+      &quot;health&quot;: &quot;PRESENT_NOT_EXERCISED&quot;,
+      &quot;confidence&quot;: &quot;VERIFIED&quot;
+    }
+  }
+]</pre></details><details class="evidence" id="evidence-actuator_inventory"><summary>actuator_inventory</summary><pre>[]</pre></details><details class="evidence" id="evidence-ros_device_inventory"><summary>ros_device_inventory</summary><pre>[]</pre></details><details class="evidence" id="evidence-ros_runtime_inventory"><summary>ros_runtime_inventory</summary><pre>[
+  {
+    &quot;category&quot;: &quot;ROS runtime&quot;,
+    &quot;name&quot;: &quot;ROS 2 graph&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;state&quot;: &quot;RUNNING&quot;,
+      &quot;nodes&quot;: 0,
+      &quot;topics&quot;: 7,
+      &quot;services&quot;: 12,
+      &quot;actions&quot;: 0,
+      &quot;detailed_nodes&quot;: 0,
+      &quot;domain_id&quot;: &quot;0&quot;,
+      &quot;middleware&quot;: &quot;default&quot;,
+      &quot;ros_distro&quot;: &quot;humble&quot;,
+      &quot;discovery_mode&quot;: &quot;daemon&quot;,
+      &quot;environment_recovered&quot;: true,
+      &quot;probe&quot;: &quot;metadata only; no publications or hardware commands&quot;
+    }
+  },
+  {
+    &quot;category&quot;: &quot;ROS topic&quot;,
+    &quot;name&quot;: &quot;/cutie/brain/status&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;state&quot;: &quot;AVAILABLE&quot;,
+      &quot;type&quot;: &quot;std_msgs/msg/String&quot;,
+      &quot;transport&quot;: &quot;DDS&quot;
+    }
+  },
+  {
+    &quot;category&quot;: &quot;ROS topic&quot;,
+    &quot;name&quot;: &quot;/cutie/response/text&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;state&quot;: &quot;AVAILABLE&quot;,
+      &quot;type&quot;: &quot;std_msgs/msg/String&quot;,
+      &quot;transport&quot;: &quot;DDS&quot;
+    }
+  },
+  {
+    &quot;category&quot;: &quot;ROS topic&quot;,
+    &quot;name&quot;: &quot;/cutie/speaker/say&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;state&quot;: &quot;AVAILABLE&quot;,
+      &quot;type&quot;: &quot;std_msgs/msg/String&quot;,
+      &quot;transport&quot;: &quot;DDS&quot;
+    }
+  },
+  {
+    &quot;category&quot;: &quot;ROS topic&quot;,
+    &quot;name&quot;: &quot;/cutie/speaker/status&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;state&quot;: &quot;AVAILABLE&quot;,
+      &quot;type&quot;: &quot;std_msgs/msg/String&quot;,
+      &quot;transport&quot;: &quot;DDS&quot;
+    }
+  },
+  {
+    &quot;category&quot;: &quot;ROS topic&quot;,
+    &quot;name&quot;: &quot;/cutie/speech/text&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;state&quot;: &quot;AVAILABLE&quot;,
+      &quot;type&quot;: &quot;std_msgs/msg/String&quot;,
+      &quot;transport&quot;: &quot;DDS&quot;
+    }
+  },
+  {
+    &quot;category&quot;: &quot;ROS topic&quot;,
+    &quot;name&quot;: &quot;/parameter_events&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;state&quot;: &quot;AVAILABLE&quot;,
+      &quot;type&quot;: &quot;rcl_interfaces/msg/ParameterEvent&quot;,
+      &quot;transport&quot;: &quot;DDS&quot;
+    }
+  },
+  {
+    &quot;category&quot;: &quot;ROS topic&quot;,
+    &quot;name&quot;: &quot;/rosout&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;state&quot;: &quot;AVAILABLE&quot;,
+      &quot;type&quot;: &quot;rcl_interfaces/msg/Log&quot;,
+      &quot;transport&quot;: &quot;DDS&quot;
+    }
+  },
+  {
+    &quot;category&quot;: &quot;ROS service&quot;,
+    &quot;name&quot;: &quot;/cutie_llm/describe_parameters&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;state&quot;: &quot;AVAILABLE&quot;,
+      &quot;type&quot;: &quot;rcl_interfaces/srv/DescribeParameters&quot;,
+      &quot;transport&quot;: &quot;DDS request/reply&quot;
+    }
+  },
+  {
+    &quot;category&quot;: &quot;ROS service&quot;,
+    &quot;name&quot;: &quot;/cutie_llm/get_parameter_types&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;state&quot;: &quot;AVAILABLE&quot;,
+      &quot;type&quot;: &quot;rcl_interfaces/srv/GetParameterTypes&quot;,
+      &quot;transport&quot;: &quot;DDS request/reply&quot;
+    }
+  },
+  {
+    &quot;category&quot;: &quot;ROS service&quot;,
+    &quot;name&quot;: &quot;/cutie_llm/get_parameters&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;state&quot;: &quot;AVAILABLE&quot;,
+      &quot;type&quot;: &quot;rcl_interfaces/srv/GetParameters&quot;,
+      &quot;transport&quot;: &quot;DDS request/reply&quot;
+    }
+  },
+  {
+    &quot;category&quot;: &quot;ROS service&quot;,
+    &quot;name&quot;: &quot;/cutie_llm/list_parameters&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;state&quot;: &quot;AVAILABLE&quot;,
+      &quot;type&quot;: &quot;rcl_interfaces/srv/ListParameters&quot;,
+      &quot;transport&quot;: &quot;DDS request/reply&quot;
+    }
+  },
+  {
+    &quot;category&quot;: &quot;ROS service&quot;,
+    &quot;name&quot;: &quot;/cutie_llm/set_parameters&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;state&quot;: &quot;AVAILABLE&quot;,
+      &quot;type&quot;: &quot;rcl_interfaces/srv/SetParameters&quot;,
+      &quot;transport&quot;: &quot;DDS request/reply&quot;
+    }
+  },
+  {
+    &quot;category&quot;: &quot;ROS service&quot;,
+    &quot;name&quot;: &quot;/cutie_llm/set_parameters_atomically&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;state&quot;: &quot;AVAILABLE&quot;,
+      &quot;type&quot;: &quot;rcl_interfaces/srv/SetParametersAtomically&quot;,
+      &quot;transport&quot;: &quot;DDS request/reply&quot;
+    }
+  },
+  {
+    &quot;category&quot;: &quot;ROS service&quot;,
+    &quot;name&quot;: &quot;/cutie_speaker/describe_parameters&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;state&quot;: &quot;AVAILABLE&quot;,
+      &quot;type&quot;: &quot;rcl_interfaces/srv/DescribeParameters&quot;,
+      &quot;transport&quot;: &quot;DDS request/reply&quot;
+    }
+  },
+  {
+    &quot;category&quot;: &quot;ROS service&quot;,
+    &quot;name&quot;: &quot;/cutie_speaker/get_parameter_types&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;state&quot;: &quot;AVAILABLE&quot;,
+      &quot;type&quot;: &quot;rcl_interfaces/srv/GetParameterTypes&quot;,
+      &quot;transport&quot;: &quot;DDS request/reply&quot;
+    }
+  },
+  {
+    &quot;category&quot;: &quot;ROS service&quot;,
+    &quot;name&quot;: &quot;/cutie_speaker/get_parameters&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;state&quot;: &quot;AVAILABLE&quot;,
+      &quot;type&quot;: &quot;rcl_interfaces/srv/GetParameters&quot;,
+      &quot;transport&quot;: &quot;DDS request/reply&quot;
+    }
+  },
+  {
+    &quot;category&quot;: &quot;ROS service&quot;,
+    &quot;name&quot;: &quot;/cutie_speaker/list_parameters&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;state&quot;: &quot;AVAILABLE&quot;,
+      &quot;type&quot;: &quot;rcl_interfaces/srv/ListParameters&quot;,
+      &quot;transport&quot;: &quot;DDS request/reply&quot;
+    }
+  },
+  {
+    &quot;category&quot;: &quot;ROS service&quot;,
+    &quot;name&quot;: &quot;/cutie_speaker/set_parameters&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;state&quot;: &quot;AVAILABLE&quot;,
+      &quot;type&quot;: &quot;rcl_interfaces/srv/SetParameters&quot;,
+      &quot;transport&quot;: &quot;DDS request/reply&quot;
+    }
+  },
+  {
+    &quot;category&quot;: &quot;ROS service&quot;,
+    &quot;name&quot;: &quot;/cutie_speaker/set_parameters_atomically&quot;,
+    &quot;status&quot;: &quot;ok&quot;,
+    &quot;details&quot;: {
+      &quot;state&quot;: &quot;AVAILABLE&quot;,
+      &quot;type&quot;: &quot;rcl_interfaces/srv/SetParametersAtomically&quot;,
+      &quot;transport&quot;: &quot;DDS request/reply&quot;
+    }
+  }
+]</pre></details><h3>Collector findings</h3><details class="evidence" id="evidence-findings"><summary>findings</summary><pre>[
+  {
+    &quot;code&quot;: &quot;SERIAL_ACCESS_INCOMPLETE&quot;,
+    &quot;severity&quot;: &quot;info&quot;,
+    &quot;summary&quot;: &quot;Current user lacks read-write access to /dev/ttyUSB0.&quot;,
+    &quot;evidence&quot;: &quot;permissions=crw-rw----, owner=root:dialout, access=denied&quot;,
+    &quot;recommendation&quot;: &quot;Confirm that this serial interface is required before changing permissions or identity rules.&quot;
+  },
+  {
+    &quot;code&quot;: &quot;ROS_ENVIRONMENT_NOT_SOURCED&quot;,
+    &quot;severity&quot;: &quot;info&quot;,
+    &quot;summary&quot;: &quot;ROS is installed, but the current shell is not sourced.&quot;,
+    &quot;evidence&quot;: &quot;Installed distributions: humble&quot;,
+    &quot;recommendation&quot;: &quot;Source the recovered ROS environment only when running interactive ROS commands.&quot;
+  },
+  {
+    &quot;code&quot;: &quot;ROBOTICS_STACKS_DETECTED&quot;,
+    &quot;severity&quot;: &quot;info&quot;,
+    &quot;summary&quot;: &quot;[OK] Detected robotics stacks: Robot State Publisher.&quot;,
+    &quot;evidence&quot;: null,
+    &quot;recommendation&quot;: null
+  },
+  {
+    &quot;code&quot;: &quot;ROBOTICS_TOOLS_DETECTED&quot;,
+    &quot;severity&quot;: &quot;info&quot;,
+    &quot;summary&quot;: &quot;[OK] Available robotics tools: colcon, rosdep, vcstool, Docker.&quot;,
+    &quot;evidence&quot;: null,
+    &quot;recommendation&quot;: null
+  },
+  {
+    &quot;code&quot;: &quot;ROBOTICS_COMPUTE_STACK_DETECTED&quot;,
+    &quot;severity&quot;: &quot;info&quot;,
+    &quot;summary&quot;: &quot;[OK] Available compute stack: CUDA Toolkit.&quot;,
+    &quot;evidence&quot;: null,
+    &quot;recommendation&quot;: null
+  },
+  {
+    &quot;code&quot;: &quot;ROS_RUNTIME_ENVIRONMENT_RECOVERED&quot;,
+    &quot;severity&quot;: &quot;info&quot;,
+    &quot;summary&quot;: &quot;[OK] Live ROS 2 graph was found using the environment of an already-running ROS process.&quot;,
+    &quot;evidence&quot;: &quot;ROS_DISTRO=humble, ROS_DOMAIN_ID=0, RMW_IMPLEMENTATION=default&quot;,
+    &quot;recommendation&quot;: &quot;Source the same ROS underlay/workspace and domain settings before running Screwdriver for deterministic discovery.&quot;
+  },
+  {
+    &quot;code&quot;: &quot;ROS_RUNTIME_DISCOVERED&quot;,
+    &quot;severity&quot;: &quot;info&quot;,
+    &quot;summary&quot;: &quot;[OK] Live ROS 2 graph: 0 nodes, 7 topics, 12 services, and 0 actions.&quot;,
+    &quot;evidence&quot;: null,
+    &quot;recommendation&quot;: null
+  }
+]</pre></details></section>
+<footer class="muted">Generated from passive evidence. Model interpretation is displayed only after deterministic validation; unknowns remain unknown.</footer></main></body></html>

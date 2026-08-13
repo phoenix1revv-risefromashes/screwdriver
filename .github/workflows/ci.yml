@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   test:
-    name: Ruff and pytest
+    name: Quality and release artifact
     runs-on: ubuntu-latest
 
     steps:
@@ -26,16 +26,32 @@ jobs:
           enable-cache: true
 
       - name: Install Python
-        run: uv python install 3.12
+        run: uv python install 3.14.7
 
       - name: Install dependencies
-        run: uv sync --locked --all-groups
+        run: uv sync --locked --all-groups --python 3.14.7
 
       - name: Run Ruff linting
-        run: uv run ruff check .
+        run: .venv/bin/ruff check .
 
       - name: Check Ruff formatting
-        run: uv run ruff format --check .
+        run: .venv/bin/ruff format --check .
 
       - name: Run tests
-        run: uv run pytest
+        run: .venv/bin/pytest
+
+      - name: Build wheel and source distribution
+        run: .venv/bin/python -m build
+
+      - name: Validate distribution metadata
+        run: .venv/bin/python -m twine check --strict dist/*
+
+      - name: Smoke-test installed wheel
+        run: scripts/smoke-test-wheel.sh dist/*.whl
+
+      - name: Upload validated release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: screwdriver-distributions
+          path: dist/*
+          if-no-files-found: error

@@ -1,25 +1,58 @@
 # Screwdriver
+
+[![Release](https://img.shields.io/badge/release-v1.0.0-0A7EA4.svg)](RELEASE_NOTES.md)
 [![CI](https://github.com/phoenix1revv-risefromashes/screwdriver/actions/workflows/ci.yml/badge.svg)](https://github.com/phoenix1revv-risefromashes/screwdriver/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
+<!-- markdownlint-disable MD013 -->
 
+## Agentic Robotics Diagnostics: See the entire system—and what’s wrong with it—in under 30 seconds.
 
-Screwdriver is a read-only Linux inspection and AI-assisted agentic-diagnostic tool for robotic systems.
+Screwdriver replaces hours of manual robot inspection with one read-only scan. It connects evidence across hardware, drivers, device paths, networking, processes, containers, ROS 2, and robotics software stacks—turning a complex machine into a clear, bottom-to-top system blueprint.
 
-It inspects hardware, drivers, software, networking, devices, and robotics runtimes, then prepares the comprehensive system architecture blueprint, identify bugs, misconfigurations, likely root causes, and recommended fixes -- running locally or agentic assistant [OPENAI, ANTHROPIC CLAUDE]
+Its agentic diagnostic engine surfaces immediate failures, misconfigurations, broken connections, and likely root causes, then delivers diagnostic commands and step-by-step fixes. Run it locally or unlock deeper analysis with OpenAI or Anthropic—all without automatically changing the system or commanding the robot.
 
+## What Screwdriver produces
+
+| Report | Purpose | Information flow |
+|---|---|---|
+| Local report | Complete deterministic inspection without a model | Host → hardware → Linux → networking → devices → ROS → software stacks |
+| Quick System Snapshot | One-page operational view | Compute → physical hardware → Linux integration → ROS 2 → capabilities → immediate problems |
+| Complete System Blueprint | Bottom-to-top technical specification | Platform → buses → devices → drivers → paths → processes/containers → ROS → stacks → capabilities |
+| Engineering Diagnostic Report | Problem-centered investigation and recovery guide | Priority → evidence → impact → causes → commands → solution → verification → rollback |
+| Structured analysis JSON | Machine-readable analysis and provenance | Provider metadata → findings → confidence → probes → evidence references |
+
+The Blueprint always presents a status matrix for 20 robotics stacks. It keeps
+**installed**, **configured**, **running**, **connected**, and **integrated** separate.
+Software presence alone is never treated as proof that a robot capability works.
+
+## How it works
+
+```mermaid
+flowchart TD
+    A["Passive Linux inspection"] --> B["Local snapshot and reports"]
+    B --> C["Evidence filtering and redaction"]
+    C --> D{"Analysis provider"}
+    D -->|Anthropic or OpenAI| E["Schema-validated model analysis"]
+    D -->|None or provider unavailable| F["Deterministic analysis"]
+    E --> G["Evidence-reference validation"]
+    F --> G
+    G --> H["Quick Snapshot"]
+    G --> I["System Blueprint"]
+    G --> J["Diagnostic Report"]
+```
 
 ## Getting started
 
 ### Requirements
 
-- A Linux robotics computer or Linux development host
+- Linux robotics computer or Linux development host
 - Git and `curl`
 - Internet access for initial setup
-- An API key only when Anthropic or OpenAI analysis is desired
+- Anthropic or OpenAI API key only for remote model-assisted analysis
 
-### Install
+### 1. Install Screwdriver
 
 ```bash
 git clone https://github.com/phoenix1revv-risefromashes/screwdriver.git
@@ -28,37 +61,210 @@ chmod +x scripts/bootstrap.sh
 ./scripts/bootstrap.sh
 ```
 
-The bootstrap script installs the pinned `uv` and Python versions locally, verifies
+The bootstrap script installs the pinned `uv` and Python versions locally, validates
 `uv.lock`, creates `.venv`, and installs the locked dependencies.
 
-Run without activating the environment:
+### 2. Export one provider API key
+
+The default provider is Anthropic:
 
 ```bash
+export ANTHROPIC_API_KEY="your-anthropic-api-key"
+```
+
+To use OpenAI instead:
+
+```bash
+export OPENAI_API_KEY="your-openai-api-key"
+```
+
+Keys are read from the environment and are not written to snapshots or reports.
+
+### 3. Verify the installation and selected key
+
+For Anthropic:
+
+```bash
+test -n "$ANTHROPIC_API_KEY" && echo "Anthropic key is set"
 .tools/bin/uv run --locked screwdriver --help
 ```
 
-Or activate it correctly AND run CLI:
+For OpenAI:
+
+```bash
+test -n "$OPENAI_API_KEY" && echo "OpenAI key is set"
+.tools/bin/uv run --locked screwdriver --help
+```
+
+### 4. Run the first complete inspection
+
+Default Anthropic analysis:
+
+```bash
+.tools/bin/uv run --locked screwdriver inspect --agentic
+```
+
+Explicit OpenAI analysis:
+
+```bash
+.tools/bin/uv run --locked screwdriver inspect --agentic \
+  --provider openai \
+  --model gpt-5.6-terra \
+  --effort medium
+```
+
+The default agentic command uses `claude-sonnet-5` with `medium` Screwdriver effort.
+
+### 5. Open the generated reports
+
+```bash
+xdg-open reports/agentic/latest/compact_snapshot.html
+xdg-open reports/agentic/latest/system-blueprint.html
+xdg-open reports/agentic/latest/diagnostic-report.html
+```
+
+The underlying deterministic report is available at:
+
+```text
+reports/local/latest/report.html
+```
+
+### 6. Re-analyze the saved snapshot later
+
+```bash
+.tools/bin/uv run --locked screwdriver analyze \
+  reports/local/latest/snapshot.json
+```
+
+This creates a new analysis without collecting the machine again.
+
+### No-key alternatives
+
+Generate the full report suite using deterministic analysis:
+
+```bash
+.tools/bin/uv run --locked screwdriver inspect --agentic --provider none
+```
+
+Generate only the local deterministic inspection:
+
+```bash
+.tools/bin/uv run --locked screwdriver inspect --local
+```
+
+To use the virtual environment directly:
 
 ```bash
 source .venv/bin/activate
 screwdriver --help
 ```
 
+Activation must be sourced. Do not execute `.venv/bin/activate` directly.
 
-### First local inspection
+## Providers, models, and effort
+
+Screwdriver v1 uses the Anthropic Messages API or OpenAI Responses API with strict
+JSON-schema output.
+
+Support labels in the tables mean:
+
+- **Default; adapter-tested** — the model ID is the code default and its adapter payload,
+  parsing, validation, fallback, and report pipeline are covered by automated tests.
+- **API-compatible** — the provider documents the required endpoint and structured-output
+  capability. These models are selectable but are not all called against live APIs in CI.
+- **Limited access** — compatibility exists, but provider/account approval may be required.
+
+Model availability can change by provider account, API tier, and region.
+
+### Anthropic
+
+| Model ID | Screwdriver effort behavior | Support status |
+|---|---|---|
+| `claude-sonnet-5` | `light`, `medium`, `high` | **Default; adapter-tested** |
+| `claude-fable-5` | `light`, `medium`, `high` | API-compatible |
+| `claude-mythos-5` | `light`, `medium`, `high` | API-compatible; limited access |
+| `claude-mythos-preview` | `light`, `medium`, `high` | API-compatible; limited access |
+| `claude-opus-5` | `light`, `medium`, `high` | API-compatible |
+| `claude-opus-4-8` | `light`, `medium`, `high` | API-compatible |
+| `claude-opus-4-7` | `light`, `medium`, `high` | API-compatible |
+| `claude-opus-4-6` | `light`, `medium`, `high` | API-compatible |
+| `claude-opus-4-5-20251101` | `light`, `medium`, `high` | API-compatible |
+| `claude-sonnet-4-6` | `light`, `medium`, `high` | API-compatible |
+| `claude-sonnet-4-5-20250929` | Model default after effort fallback | API-compatible |
+| `claude-haiku-4-5-20251001` | Model default after effort fallback | API-compatible |
+
+- Default: `claude-sonnet-5`
+- Environment variable: `ANTHROPIC_API_KEY`
+- API: Anthropic Messages API
+- Official references: [model overview](https://platform.claude.com/docs/en/about-claude/models/overview), [structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs), and [effort](https://platform.claude.com/docs/en/build-with-claude/effort)
+
+### OpenAI
+
+| Model ID | Screwdriver effort behavior | Support status |
+|---|---|---|
+| `gpt-5.6-terra` | `light`, `medium`, `high` | **Default; adapter-tested** |
+| `gpt-5.6-sol` | `light`, `medium`, `high` | API-compatible |
+| `gpt-5.6` | `light`, `medium`, `high` | API-compatible alias for `gpt-5.6-sol` |
+| `gpt-5.6-luna` | `light`, `medium`, `high` | API-compatible |
+| `gpt-5.5` | `light`, `medium`, `high` | API-compatible |
+| `gpt-5.5-pro` | `medium`, `high`; `light` falls back to model default | API-compatible with timeout caution |
+| `gpt-5.4` | `light`, `medium`, `high` | API-compatible |
+| `gpt-5.4-mini` | `light`, `medium`, `high` | API-compatible |
+| `gpt-5.4-nano` | `light`, `medium`, `high` | API-compatible |
+
+- Default: `gpt-5.6-terra`
+- Environment variable: `OPENAI_API_KEY`
+- API: OpenAI Responses API
+- Official references: [model catalog](https://developers.openai.com/api/docs/models) and [GPT-5.6 Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra)
+
+`gpt-5.4-pro` is incompatible with Screwdriver v1 because it does not support the
+required structured output. Realtime, audio, image-generation, transcription,
+embedding, moderation, and other non-text-analysis models are outside the adapter
+contract.
+
+`gpt-5.5-pro` may take several minutes and can exceed Screwdriver v1's 120-second
+provider timeout on difficult snapshots.
+
+### Effort mapping
+
+Screwdriver deliberately exposes three portable effort levels, even when a provider
+offers additional values:
+
+| CLI value | Provider API value | Intended use |
+|---|---|---|
+| `light` | `low` | Faster, lower-cost analysis of straightforward evidence |
+| `medium` | `medium` | Balanced complete-system analysis; **default** |
+| `high` | `high` | Deeper correlation for complex bring-up and diagnostics |
+
+If a compatible model rejects the explicit effort field, Screwdriver retries once
+without it and records that the model's native default was used.
+
+### Deterministic provider
+
+Select `none` to create all reports without a remote model:
 
 ```bash
-.tools/bin/uv run --locked screwdriver inspect --local
+screwdriver inspect --agentic --provider none
 ```
 
-Open `reports/local/latest/report.html`.
+This mode requires no API key. Plain `--agentic` does **not** select deterministic mode;
+it selects the default Anthropic provider.
 
+### Custom model IDs
 
+Screwdriver does not enforce a closed model allowlist. `--model` accepts a custom model
+ID, but successful analysis requires:
+
+- The endpoint used by the selected provider adapter
+- Strict JSON-schema structured output
+- Sufficient context and output capacity for the snapshot and analysis
+
+The provider validates custom-model availability and capabilities at request time.
 
 ## Complete command reference
 
-The examples below omit `.tools/bin/uv run --locked` for readability. Prefix it when
-the environment is not activated.
+The examples below assume the virtual environment is activated. Otherwise prefix each
+command with `.tools/bin/uv run --locked`.
 
 ### Help
 
@@ -73,43 +279,48 @@ screwdriver analyze --help
 
 Collect a new passive snapshot from the current Linux computer:
 
-```bash
+```text
 screwdriver inspect [--local | --agentic] [OPTIONS]
 ```
 
 | Option | Values | Default | Meaning |
 |---|---|---|---|
 | `--local` | Flag | Used when no mode is supplied | Generate local deterministic reports |
-| `--agentic` | Flag | Off | Collect locally, then generate all three analysis reports |
-| `--output` | Path | `reports` | Root containing `local/` and `agentic/` |
+| `--agentic` | Flag | Off | Collect locally and generate the three analysis reports |
+| `--output` | Path | `reports` | Report root containing `local/` and `agentic/` |
 | `--provider` | `anthropic`, `openai`, `none` | `anthropic` | Analysis provider used with `--agentic` |
 | `--model` | Model ID | Provider default | Override the provider's default model |
-| `--effort` | `light`, `medium`, `high` | `medium` | Requested reasoning effort |
+| `--effort` | `light`, `medium`, `high` | `medium` | Requested analysis effort |
 | `--focus` | Text | Complete system | Emphasize a subsystem while retaining complete evidence; requires `--agentic` |
 | `--investigate` | Flag | Off | Permit up to four validated read-only probes; requires `--agentic` |
 | `-h`, `--help` | Flag | — | Show command help |
 
-`--local` and `--agentic` are mutually exclusive. Provider options do nothing during
-a local-only inspection.
+`--local` and `--agentic` are mutually exclusive. Provider options do not affect a
+local-only inspection.
 
 ```bash
-# Local modes
+# Default local inspection
 screwdriver inspect
-screwdriver inspect --local
-screwdriver inspect --local --output /path/to/reports
 
-# Default agentic mode: Anthropic, Claude Sonnet 5, medium effort
+# Explicit local inspection
+screwdriver inspect --local
+
+# Default agentic inspection: Anthropic, Claude Sonnet 5, medium effort
 screwdriver inspect --agentic
 
-# Explicit Anthropic
+# Explicit Anthropic analysis
 screwdriver inspect --agentic \
-  --provider anthropic --model claude-sonnet-5 --effort medium
+  --provider anthropic \
+  --model claude-sonnet-5 \
+  --effort medium
 
-# Explicit OpenAI
+# Explicit OpenAI analysis
 screwdriver inspect --agentic \
-  --provider openai --model gpt-5.6-terra --effort medium
+  --provider openai \
+  --model gpt-5.6-terra \
+  --effort medium
 
-# No remote model
+# Full deterministic report suite
 screwdriver inspect --agentic --provider none
 
 # Focused interpretation
@@ -131,10 +342,9 @@ screwdriver inspect --agentic \
 
 ### `screwdriver analyze`
 
-Generate analysis reports from an existing `snapshot.json` without collecting the
-computer again:
+Generate analysis reports from an existing `snapshot.json` without collecting again:
 
-```bash
+```text
 screwdriver analyze SNAPSHOT [OPTIONS]
 ```
 
@@ -144,7 +354,7 @@ screwdriver analyze SNAPSHOT [OPTIONS]
 | `--output` | Path | `reports` | Root containing the new agentic run |
 | `--provider` | `anthropic`, `openai`, `none` | `anthropic` | Remote or deterministic analysis |
 | `--model` | Model ID | Provider default | Override the provider model |
-| `--effort` | `light`, `medium`, `high` | `medium` | Requested reasoning effort |
+| `--effort` | `light`, `medium`, `high` | `medium` | Requested analysis effort |
 | `--focus` | Text | Complete system | Emphasize one subsystem while retaining complete evidence |
 | `--investigate` | Flag | Off | Permit validated probes when the snapshot belongs to this host |
 | `-h`, `--help` | Flag | — | Show command help |
@@ -156,76 +366,26 @@ screwdriver analyze reports/local/latest/snapshot.json
 # Deterministic analysis
 screwdriver analyze reports/local/latest/snapshot.json --provider none
 
-# Explicit Anthropic
+# Explicit Anthropic analysis
 screwdriver analyze reports/local/latest/snapshot.json \
-  --provider anthropic --model claude-sonnet-5 --effort high
+  --provider anthropic \
+  --model claude-sonnet-5 \
+  --effort high
 
-# OpenAI with focused investigation
+# OpenAI focused investigation
 screwdriver analyze reports/local/latest/snapshot.json \
   --provider openai \
   --model gpt-5.6-terra \
   --effort high \
   --focus "serial controller and ROS ownership" \
   --investigate
-
-# Custom report root
-screwdriver analyze /path/to/snapshot.json \
-  --provider none --output /path/to/reports
 ```
-
-## Provider, model, and effort chart
-
-| Provider | CLI value | Default verified model | Compatible models | API key | Efforts |
-|---|---|---|---|---|---|
-| Anthropic | `anthropic` | `claude-sonnet-5` | Anthropic Messages API models supporting JSON-schema structured output; custom model IDs are accepted | `ANTHROPIC_API_KEY` | `light`, `medium`, `high` |
-| OpenAI | `openai` | `gpt-5.6-terra` | OpenAI Responses API models supporting strict JSON-schema text output; custom model IDs are accepted | `OPENAI_API_KEY` | `light`, `medium`, `high` |
-| Deterministic | `none` | No model | Not applicable | None | Accepted by the CLI, but no remote reasoning occurs |
-
-The named defaults are the tested v1 configurations. Custom model availability and
-structured-output support depend on the provider account and API. Screwdriver accepts
-custom IDs, and the provider validates their capabilities at request time.
-
-| Screwdriver effort | Provider API value | Intended use |
-|---|---|---|
-| `light` | `low` | Faster, lower-cost organization of straightforward evidence |
-| `medium` | `medium` | Balanced default for complete system analysis |
-| `high` | `high` | Deeper correlation for complex bring-up and diagnostics |
-
-If a compatible model rejects the effort field, Screwdriver retries once without it
-and records that the model's native default was used. If a remote provider is missing
-its key or unavailable, deterministic fallback reports are still generated and clearly
-labeled.
-
-
-### Uisng Agentic-assistance (API keys)
-First export the API_KEY to the terminal environemt:
-
-```bash
-export ANTHROPIC_API_KEY="your-anthropic-api-key"
-```
-
-```bash
-export OPENAI_API_KEY="your-openai-api-key"
-```
-
-
-Then ssimply follow the CLI protocol explained before:
-
-screwdriver inspect --agentic \
-  --provider anthropic --model claude-sonnet-5 --effort medium
-
-# Explicit OpenAI
-screwdriver inspect --agentic \
-  --provider openai --model gpt-5.6-terra --effort medium
-
-
-Keys are read from the environment and are never written to snapshots or reports.
 
 ## Output layout
 
 Runs use America/Los_Angeles report time and non-overwriting directory names in the
-form `YYYY-MM-DD_HH:MM:SS`. A numeric suffix handles timestamp collisions. The
-`latest` symlink is updated atomically after completion.
+form `YYYY-MM-DD_HH:MM:SS`. A numeric suffix handles timestamp collisions. The `latest`
+symlink is updated atomically after completion.
 
 ```text
 reports/
@@ -254,29 +414,29 @@ never overwritten.
 
 Screwdriver passively collects and correlates:
 
-- Linux, kernel, architecture, platform, firmware, CPU, memory, GPU, storage, power,
-  thermals, processes, and services
+- Linux distribution, kernel, architecture, platform, firmware, CPU, memory, GPU,
+  storage, power, thermals, processes, and services
 - USB topology, PCI evidence, serial/UART, stable device identities, permissions,
   kernel modules, drivers, and device paths
 - Network interfaces, IP configuration, routes, DNS, link state, CAN, and virtual links
 - Sensors, actuators, cameras, audio devices, LiDAR, MCU/debug interfaces, and containers
 - ROS installations, sourced environment, workspaces, RMW/DDS, domain ID, and discovery
-- ROS nodes, topics, services, actions, data flow, and hardware ownership evidence
+- ROS nodes, topics, services, actions, data-flow evidence, and hardware-ownership evidence
 
-### Robotics software-stack coverage
+### Robotics software stacks
 
 | Domain | Tracked stacks and capabilities |
 |---|---|
 | Navigation and localization | Navigation2, AMCL, Robot Localization |
 | SLAM and mapping | SLAM Toolbox, Cartographer, RTAB-Map |
 | Motion and control | `ros2_control`, hardware interfaces, controllers |
-| Manipulation | MoveIt, planning scenes, trajectories, execution paths |
-| Perception and AI | Camera drivers, LiDAR drivers, GPU-accelerated perception |
-| Speech and interaction | Audio capture/playback, STT, TTS |
-| MCU and embedded bridges | micro-ROS and observable serial, UDP, or CAN bridges |
+| Manipulation | MoveIt and observable planning/trajectory paths |
+| Perception and AI | Camera drivers, LiDAR drivers, accelerated perception |
+| Speech and interaction | Audio capture/playback, STT, and TTS |
+| Embedded integration | micro-ROS and observable MCU bridges |
 | Simulation and visualization | Gazebo, Isaac ROS, Webots, RViz, Robot State Publisher |
 | Teleoperation | Keyboard, joystick, and remote command paths |
-| Recording and telemetry | Rosbag, diagnostics, monitoring, and health aggregation |
+| Recording and telemetry | Rosbag, diagnostics, monitoring, health aggregation |
 
 For every recognized stack, Screwdriver separates:
 
@@ -284,27 +444,32 @@ For every recognized stack, Screwdriver separates:
 installation → configuration → runtime → connectivity → integration → capability
 ```
 
-An absent optional stack is not a fault unless evidence establishes that the deployed
-robot requires it. Older snapshots receive explicit **not recorded in snapshot** states
-instead of misleading `NOT_INSTALLED` claims.
+An absent optional stack is not a failure unless collected evidence establishes that the
+robot requires it. Older snapshots show **not recorded in snapshot** instead of falsely
+claiming **not installed**.
 
 ## Evidence guarantees
 
-- Raw `snapshot.json` remains on the inspected host.
+- The full raw `snapshot.json` remains on the inspected host.
 - Provider evidence is bounded, deduplicated, and redacted.
 - Machine IDs, serial numbers, MAC addresses, and gateway identifiers are removed from
   the provider evidence view.
-- Truncated or omitted paths are disclosed.
-- Remote output must match a strict schema.
-- New model findings are accepted only when evidence references resolve to the snapshot.
-- Observation confidence and diagnosis confidence are separate.
-- Provider, model, effort, token usage when available, request ID, duration, fallback
-  state, scan ID, and snapshot hash are preserved.
-- Unknown evidence remains unknown.
+- Truncated and omitted paths are disclosed.
+- Remote output must match the required schema.
+- New model findings are accepted only when their evidence references resolve to the
+  collected snapshot.
+- Observation confidence and diagnosis confidence remain separate.
+- Provider, model, requested effort, actual effort behavior, request duration, token
+  usage when available, request ID, fallback state, scan ID, and snapshot hash are
+  preserved.
+- Missing evidence remains unknown rather than being converted into a failure.
+
+If a remote provider is unavailable, Screwdriver still generates clearly labeled
+deterministic fallback reports.
 
 ## Read-only investigation
 
-`--investigate` permits at most four provider-requested checks:
+`--investigate` permits at most four provider-requested checks from a closed catalog:
 
 | Probe | Command family |
 |---|---|
@@ -317,9 +482,21 @@ instead of misleading `NOT_INSTALLED` claims.
 | Recent kernel messages | `journalctl -k` |
 | Network link metadata | `ip -details link show` |
 
-Targets are validated, commands execute without a shell, time and output are bounded,
-and rejected requests remain visible. Probes run only when the snapshot hostname
-matches the current computer.
+Targets are validated, commands run without a shell, time and output are bounded, and
+rejected requests remain visible. Probes run only when the snapshot hostname matches the
+current computer.
+
+## Known limitations in v1.0.0
+
+- Screwdriver reports only what passive inspection can establish. It does not prove
+  real-world sensor accuracy, actuator motion, navigation success, or task completion.
+- Physical hardware → Linux process → ROS node ownership is reported only when evidence
+  establishes the relationship. Otherwise it remains **not established**.
+- Container isolation, permissions, unsourced overlays, ROS domain differences, and DDS
+  configuration can hide an active runtime from the inspection context.
+- An inaccessible or absent optional interface is not automatically a robot failure.
+- Model-assisted conclusions remain constrained by the completeness and freshness of the
+  collected snapshot.
 
 ## Safety
 
@@ -329,15 +506,15 @@ Screwdriver does **not** automatically:
 - Modify configuration or network settings
 - Install, upgrade, or remove packages
 - Restart services or containers
-- Change users, groups, ownership, or device permissions
+- Change users, groups, ownership, device permissions, or udev policy
 - Load or unload kernel modules
 - Flash firmware
 - Execute model-generated repair commands
 
 The Diagnostic Report may display clearly labeled system-changing command examples for
-human review. It never executes them.
+human review. Screwdriver never executes them automatically.
 
-## Development
+## Development and verification
 
 ```bash
 ./scripts/bootstrap.sh
@@ -348,7 +525,7 @@ human review. It never executes them.
 .tools/bin/uv run --locked pytest
 ```
 
-After an intentional `pyproject.toml` dependency change:
+After an intentional dependency change:
 
 ```bash
 .tools/bin/uv lock
@@ -358,11 +535,32 @@ After an intentional `pyproject.toml` dependency change:
 Commit `pyproject.toml` and `uv.lock` together. Do not regenerate the lockfile merely to
 hide an unexpected mismatch.
 
+## Troubleshooting
 
+### `.venv/bin/activate: Permission denied`
+
+Source the activation script:
+
+```bash
+source .venv/bin/activate
+```
+
+Alternatively, skip activation and prefix commands with `.tools/bin/uv run --locked`.
+
+### `uv.lock needs to be updated, but --locked was provided`
+
+First confirm that `pyproject.toml` and `uv.lock` came from the same revision. If the
+dependency change was intentional:
+
+```bash
+.tools/bin/uv lock
+.tools/bin/uv sync --locked --group dev
+```
 
 ### Provider key is missing
 
-Deterministic fallback is automatic. To request it explicitly:
+Screwdriver generates deterministic fallback reports when the requested provider is
+unavailable. To choose deterministic analysis explicitly:
 
 ```bash
 screwdriver inspect --agentic --provider none
@@ -371,17 +569,22 @@ screwdriver inspect --agentic --provider none
 ### ROS 2 is installed but the graph is empty
 
 Run Screwdriver from the same sourced underlay, overlay, domain, and middleware context
-used by the robot application. Installed ROS, a sourced shell, and a discoverable graph
-are separate evidence states.
+used by the robot application. ROS installation, shell environment, graph discovery,
+and application runtime are separate evidence states.
 
-## License
-
-Screwdriver is released under the [MIT License](LICENSE). Copyright © 2026 Phoenix Bogati.
-
-
-## Sample reports
+## Samples and release notes
 
 - [Quick System Snapshot](assets/samples/compact_snapshot.html)
 - [Complete System Blueprint](assets/samples/system-blueprint.html)
 - [Engineering Diagnostic Report](assets/samples/diagnostic-report.html)
+- [Structured analysis JSON](assets/samples/agent-analysis.json)
+- [Screwdriver v1.0.0 release notes](RELEASE_NOTES.md)
 
+Publish sanitized samples only. Raw evidence appendices can contain real local system
+identifiers.
+
+## License
+
+Screwdriver is released under the [MIT License](LICENSE).
+
+Copyright © 2026 Phoenix Bogati.
