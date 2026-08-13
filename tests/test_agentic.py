@@ -221,7 +221,7 @@ def test_deterministic_analysis_writes_compact_and_detailed_report_contract(
     assert 'id="platform"' in blueprint
     assert 'id="software"' in blueprint
     assert analysis["repairs_executed"] is False
-    assert analysis["screwdriver_version"] == "0.2.1"
+    assert analysis["screwdriver_version"] == "1.0.0"
     assert analysis["snapshot_sha256"]
     assert analysis["successful_checks"]
     assert analysis["issues"][0]["code"] == "MEMORY_HIGH_USAGE"
