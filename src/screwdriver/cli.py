@@ -26,7 +26,7 @@ from screwdriver.models import (
     SystemSnapshot,
     USBDevice,
 )
-from screwdriver.progress import AnalysisProgress
+from screwdriver.progress import AnalysisProgress, InspectionProgress
 from screwdriver.report_time import REPORT_TIMEZONE_NAME, format_report_time
 from screwdriver.storage import (
     ReportPaths,
@@ -160,26 +160,42 @@ def _run_inspect(args: argparse.Namespace) -> int:
 
     started_monotonic = time.monotonic()
     started_at = datetime.now(UTC)
-    snapshot = collect_host()
-    duration = time.monotonic() - started_monotonic
     mode = "agentic" if args.agentic else "local"
-    run = create_report_run(args.output, created_at=snapshot.created_at)
-    paths = build_report_paths(run.local_directory)
-    report = format_snapshot(
-        snapshot,
-        mode=mode,
-        started_at=started_at,
-        duration=duration,
-        paths=paths,
-        focus=args.focus,
-    )
-    report_paths = save_reports(
-        snapshot,
-        report,
-        run.local_directory,
-        scan_id=run.scan_id,
-        duration_seconds=duration,
-    )
+    progress = InspectionProgress()
+    progress.start(mode)
+    try:
+        snapshot = collect_host(progress=progress.stage)
+        collection_duration = time.monotonic() - started_monotonic
+        run = create_report_run(args.output, created_at=snapshot.created_at)
+        paths = build_report_paths(run.local_directory)
+        progress.stage(8, "Building & saving inspection reports")
+        report = format_snapshot(
+            snapshot,
+            mode=mode,
+            started_at=started_at,
+            duration=collection_duration,
+            paths=paths,
+            focus=args.focus,
+        )
+        report_paths = save_reports(
+            snapshot,
+            report,
+            run.local_directory,
+            scan_id=run.scan_id,
+            duration_seconds=collection_duration,
+        )
+    except KeyboardInterrupt:
+        progress.fail("Inspection interrupted")
+        raise
+    except Exception:
+        progress.fail("Inspection failed")
+        raise
+    else:
+        progress.finish("Inspection complete")
+    finally:
+        progress.close()
+
+    duration = collection_duration
     if not args.find_issues:
         print(report)
     elif not args.agentic:
@@ -197,7 +213,7 @@ def _run_inspect(args: argparse.Namespace) -> int:
             run.agentic_directory,
             args=args,
             scan_id=run.scan_id,
-            collection_duration_seconds=duration,
+            collection_duration_seconds=collection_duration,
         )
         if args.find_issues:
             print(

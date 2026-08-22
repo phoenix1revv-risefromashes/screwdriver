@@ -754,3 +754,23 @@ def test_anthropic_retries_without_effort_when_compatible_model_rejects_it(
     assert result.provider_status == (
         "Anthropic model claude-haiku-4-5 (effort model default; requested light unsupported)"
     )
+
+
+def test_deterministic_analysis_progress_is_sequential(
+    tmp_path: Path,
+) -> None:
+    snapshot_path = tmp_path / "snapshot.json"
+    output = tmp_path / "analysis"
+    snapshot_path.write_text(json.dumps(_snapshot()), encoding="utf-8")
+    events: list[tuple[int, str, bool]] = []
+
+    analyze_snapshot_file(
+        snapshot_path,
+        output,
+        provider="none",
+        progress=lambda number, label, waiting=False: events.append((number, label, waiting)),
+    )
+
+    assert [number for number, _label, _waiting in events] == [1, 2, 3, 4, 5, 6]
+    assert events[2][1] == "Evaluating deterministic diagnostic rules…"
+    assert all(waiting is False for _number, _label, waiting in events)

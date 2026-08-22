@@ -15,13 +15,16 @@ from screwdriver.models import (
     FindingSeverity,
     SystemSnapshot,
 )
+from screwdriver.progress import ProgressCallback
 
 
-def collect_host() -> SystemSnapshot:
+def collect_host(progress: ProgressCallback | None = None) -> SystemSnapshot:
     """Collect host, ROS, and robotics-software data without changing state."""
 
-    snapshot = _collect_host()
+    snapshot = _collect_host(progress=progress) if progress else _collect_host()
     _remove_known_false_positives(snapshot)
+    if progress:
+        progress(5, "Inspecting robotics software stack")
     components, findings = collect_robotics_software()
     runtime_components = [*snapshot.components, *components]
     snapshot.components.extend(
@@ -29,6 +32,8 @@ def collect_host() -> SystemSnapshot:
     )
     snapshot.findings.extend(findings)
 
+    if progress:
+        progress(6, "Inspecting ROS 2 & runtime")
     try:
         runtime = collect_runtime_inventory(
             runtime_components,
@@ -64,6 +69,8 @@ def collect_host() -> SystemSnapshot:
         snapshot.ros_runtime_inventory = runtime.ros_runtime
         snapshot.findings.extend(runtime.findings)
 
+    if progress:
+        progress(7, "Evaluating system findings")
     _reclassify_conditional_findings(snapshot)
 
     if any(

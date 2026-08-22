@@ -41,30 +41,52 @@ from screwdriver.models import (
     SystemSnapshot,
     ThermalSensor,
 )
+from screwdriver.progress import ProgressCallback
 
 _DMI_ROOT = Path("/sys/class/dmi/id")
 _DEVICE_TREE_ROOT = Path("/proc/device-tree")
 
 
-def collect_host() -> SystemSnapshot:
+def collect_host(progress: ProgressCallback | None = None) -> SystemSnapshot:
     """Collect a complete, machine-neutral snapshot of the current host."""
 
+    if progress:
+        progress(1, "Inspecting host & operating system")
+    identity = collect_identity()
+    operating_system = collect_operating_system()
+
+    if progress:
+        progress(2, "Inspecting compute, memory & storage")
     cpu = collect_cpu()
     platform_info = collect_platform(cpu.vendor)
+    memory = collect_memory()
+    storage_devices = collect_storage_devices()
+    gpus = collect_gpus(platform_info)
+
+    if progress:
+        progress(3, "Discovering hardware & device interfaces")
+    usb_devices = collect_usb_devices()
+    serial_devices = collect_serial_devices()
+
+    if progress:
+        progress(4, "Checking network, power & thermals")
+    thermal_sensors = collect_thermal_sensors()
+    power = collect_power(platform_info)
+    network = collect_network()
 
     snapshot = SystemSnapshot(
-        identity=collect_identity(),
-        operating_system=collect_operating_system(),
+        identity=identity,
+        operating_system=operating_system,
         platform=platform_info,
         cpu=cpu,
-        memory=collect_memory(),
-        storage_devices=collect_storage_devices(),
-        gpus=collect_gpus(platform_info),
-        thermal_sensors=collect_thermal_sensors(),
-        power=collect_power(platform_info),
-        network=collect_network(),
-        usb_devices=collect_usb_devices(),
-        serial_devices=collect_serial_devices(),
+        memory=memory,
+        storage_devices=storage_devices,
+        gpus=gpus,
+        thermal_sensors=thermal_sensors,
+        power=power,
+        network=network,
+        usb_devices=usb_devices,
+        serial_devices=serial_devices,
     )
 
     snapshot.findings.extend(_create_findings(snapshot))

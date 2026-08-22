@@ -303,6 +303,27 @@ screwdriver inspect [--local | --agentic] [--find-issues] [OPTIONS]
 `--local` and `--agentic` are mutually exclusive. Provider options do not affect a
 local-only inspection.
 
+### Visible workflow progress
+
+Long-running inspection and analysis commands report real backend milestones with measured
+elapsed time. Progress is written to stderr so structured output and saved reports remain clean.
+Screwdriver does not display synthetic percentages or add artificial delays.
+
+```text
+[1/8] Inspecting host & operating system .................. ✓ 0.4s
+[2/8] Inspecting compute, memory & storage ................ ✓ 1.1s
+[3/8] Discovering hardware & device interfaces ............ ✓ 0.7s
+[4/8] Checking network, power & thermals .................. ✓ 0.3s
+[5/8] Inspecting robotics software stack .................. ✓ 0.8s
+[6/8] Inspecting ROS 2 & runtime .......................... ✓ 1.5s
+[7/8] Evaluating system findings .......................... ✓ 0.2s
+[8/8] Building & saving inspection reports ................ ✓ 0.3s
+✓ Inspection complete · 5.3s
+```
+
+Agentic analysis uses the same stage-based progress model and adds a live elapsed-time heartbeat
+while waiting on a model provider.
+
 ```bash
 # Default local inspection
 screwdriver inspect

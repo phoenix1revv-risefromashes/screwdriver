@@ -16,7 +16,7 @@ import subprocess
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import Any, cast
 
 from screwdriver import __version__
 from screwdriver.agent_providers import (
@@ -35,16 +35,13 @@ from screwdriver.agentic_reports import (
     render_diagnostic_report,
     render_system_blueprint,
 )
+from screwdriver.progress import ProgressCallback
 from screwdriver.storage import update_latest_reference
 
 _DEFAULT_EFFORT = "medium"
 _MAX_OUTPUT_TOKENS = 12_000
 _MAX_PROBES = 4
 _MAX_PROBE_OUTPUT = 12_000
-
-
-class ProgressCallback(Protocol):
-    def __call__(self, number: int, label: str, waiting: bool = False) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -183,27 +180,28 @@ def analyze_snapshot_file(
         diagnostics=output_directory / "diagnostic-report.html",
         analysis=output_directory / "agent-analysis.json",
     )
-    deterministic_baseline = _deterministic_issues(snapshot)
-    accepted_issues = deterministic_baseline
+    if provider not in PROVIDER_CHOICES:
+        raise ValueError("provider must be one of: " + ", ".join(PROVIDER_CHOICES))
+    if effort not in EFFORT_CHOICES:
+        raise ValueError("effort must be one of: " + ", ".join(EFFORT_CHOICES))
+
+    if progress:
+        progress(2, "Building deterministic system context…")
     summary = _deterministic_summary(snapshot)
     observations = _architecture_observations(snapshot)
     unknowns = _unknowns(snapshot)
     probes: list[ProbeResult] = []
     provider_status = "deterministic analysis"
     provider_response: ProviderResponse | None = None
-
-    if provider not in PROVIDER_CHOICES:
-        raise ValueError("provider must be one of: " + ", ".join(PROVIDER_CHOICES))
-    if effort not in EFFORT_CHOICES:
-        raise ValueError("effort must be one of: " + ", ".join(EFFORT_CHOICES))
-
     resolved_model = resolve_model(provider, model) if provider != "none" else "none"
+
     if provider != "none":
+        deterministic_baseline = _deterministic_issues(snapshot)
+        accepted_issues = deterministic_baseline
         adapter = get_provider(provider)
+        if progress:
+            progress(3, f"Analyzing evidence with {resolved_model}…", True)
         try:
-            if progress:
-                progress(2, f"Sending evidence to {adapter.display_name}…")
-                progress(3, f"Waiting for {resolved_model} analysis…", True)
             provider_response = _provider_analysis(
                 snapshot,
                 deterministic_baseline,
@@ -216,9 +214,17 @@ def analyze_snapshot_file(
             provider_status = (
                 f"{adapter.display_name} unavailable; deterministic fallback ({exception})"
             )
+            if progress:
+                progress(4, "Validating deterministic fallback findings…")
         else:
             if progress:
-                progress(4, "Validating findings against collected evidence…")
+                progress(
+                    4,
+                    "Validating findings & read-only investigation…"
+                    if investigate
+                    else "Validating findings against collected evidence…",
+                    investigate,
+                )
             provider_status = _provider_status(adapter, resolved_model, provider_response)
             response = provider_response.analysis
             summary = _clean_text(response.get("summary")) or summary
@@ -262,9 +268,14 @@ def analyze_snapshot_file(
                             deterministic_baseline,
                             revised.get("issues"),
                         )
+    else:
+        if progress:
+            progress(3, "Evaluating deterministic diagnostic rules…")
+        deterministic_baseline = _deterministic_issues(snapshot)
+        accepted_issues = deterministic_baseline
+        if progress:
+            progress(4, "Validating deterministic findings against collected evidence…")
 
-    if progress and provider == "none":
-        progress(4, "Validating deterministic findings against collected evidence…")
     if progress:
         progress(5, "Generating diagnostic reports…")
     output_directory.mkdir(parents=True, exist_ok=True)
