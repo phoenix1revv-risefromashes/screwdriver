@@ -15,10 +15,11 @@ from screwdriver.agent_providers import (
     PROVIDER_CHOICES,
     resolve_model,
 )
-from screwdriver.agentic import analyze_snapshot_file
+from screwdriver.agentic import DiagnosticIssue, analyze_snapshot_file
 from screwdriver.collectors import collect_host
 from screwdriver.models import (
     Component,
+    Finding,
     FindingSeverity,
     NetworkInterface,
     SerialDevice,
@@ -58,6 +59,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--agentic",
         action="store_true",
         help="Generate a system blueprint and diagnostic report after collection.",
+    )
+    inspect_parser.add_argument(
+        "--find-issues",
+        action="store_true",
+        help=(
+            "Run the full inspection but print only actionable warning/error findings. "
+            "Combine with --agentic for issue-centered reasoning."
+        ),
     )
     inspect_parser.add_argument(
         "--focus",
@@ -171,7 +180,17 @@ def _run_inspect(args: argparse.Namespace) -> int:
         scan_id=run.scan_id,
         duration_seconds=duration,
     )
-    print(report)
+    if not args.find_issues:
+        print(report)
+    elif not args.agentic:
+        print(
+            format_issue_findings(
+                snapshot,
+                duration=duration,
+                report_directory=run.local_directory,
+            )
+        )
+
     if args.agentic:
         outcome = _run_agentic_analysis(
             report_paths.snapshot,
@@ -180,16 +199,147 @@ def _run_inspect(args: argparse.Namespace) -> int:
             scan_id=run.scan_id,
             collection_duration_seconds=duration,
         )
-        print("\n\nAGENTIC REPORTS")
-        print("─" * _WIDTH)
-        print(f"Compact snapshot:  {outcome.paths.compact}")
-        print(f"System blueprint:  {outcome.paths.blueprint}")
-        print(f"Diagnostic report: {outcome.paths.diagnostics}")
-        print(f"Structured analysis: {outcome.paths.analysis}")
-        print(f"Analysis engine:    {outcome.provider_status}")
-        print(f"Problems reported: {len(outcome.issues)}")
-        print(f"Read-only probes:  {len(outcome.probes)}")
+        if args.find_issues:
+            print(
+                format_agentic_issue_findings(
+                    outcome.issues,
+                    provider_status=outcome.provider_status,
+                    duration=duration,
+                    report_directory=run.agentic_directory,
+                )
+            )
+        else:
+            print("\n\nAGENTIC REPORTS")
+            print("─" * _WIDTH)
+            print(f"Compact snapshot:  {outcome.paths.compact}")
+            print(f"System blueprint:  {outcome.paths.blueprint}")
+            print(f"Diagnostic report: {outcome.paths.diagnostics}")
+            print(f"Structured analysis: {outcome.paths.analysis}")
+            print(f"Analysis engine:    {outcome.provider_status}")
+            print(f"Problems reported: {len(outcome.issues)}")
+            print(f"Read-only probes:  {len(outcome.probes)}")
     return 0
+
+
+def _actionable_findings(snapshot: SystemSnapshot) -> list[Finding]:
+    """Return deterministic findings that require operator attention."""
+
+    severity_order = {
+        FindingSeverity.ERROR: 0,
+        FindingSeverity.WARNING: 1,
+    }
+    findings = [finding for finding in snapshot.findings if finding.severity in severity_order]
+    return sorted(findings, key=lambda finding: severity_order[finding.severity])
+
+
+def format_issue_findings(
+    snapshot: SystemSnapshot,
+    *,
+    duration: float,
+    report_directory: Path,
+) -> str:
+    """Render only actionable deterministic findings for terminal-first triage."""
+
+    findings = _actionable_findings(snapshot)
+    error_count = sum(finding.severity is FindingSeverity.ERROR for finding in findings)
+    warning_count = sum(finding.severity is FindingSeverity.WARNING for finding in findings)
+
+    lines = [
+        "SCREWDRIVER — FIND ISSUES",
+        "─" * _WIDTH,
+        "",
+    ]
+    if not findings:
+        lines.extend(
+            [
+                "No actionable issues detected.",
+                "",
+                "0 errors · 0 warnings",
+            ]
+        )
+    else:
+        noun = "issue" if len(findings) == 1 else "issues"
+        lines.extend([f"{len(findings)} {noun} found", ""])
+        for finding in findings:
+            lines.append(f"[{finding.severity.value.upper()}] {finding.summary}")
+            if finding.evidence:
+                lines.append(f"Evidence: {finding.evidence}")
+            if finding.recommendation:
+                lines.append(f"Next action: {finding.recommendation}")
+            lines.append("")
+        lines.append(f"{error_count} errors · {warning_count} warnings")
+
+    lines.extend(
+        [
+            f"Inspection completed in {duration:.2f}s",
+            f"Full scan saved: {report_directory}",
+        ]
+    )
+    return "\n".join(lines).rstrip()
+
+
+def _actionable_agentic_issues(issues: Sequence[DiagnosticIssue]) -> list[DiagnosticIssue]:
+    """Keep agentic terminal output focused on evidence-backed actionable issues."""
+
+    severity_order = {
+        "CRITICAL": 0,
+        "HIGH": 1,
+        "MEDIUM": 2,
+        "LOW": 3,
+    }
+    actionable = [
+        issue
+        for issue in issues
+        if issue.severity.upper() in severity_order
+        and issue.classification not in {"ADVISORY", "NEEDS_CONFIRMATION"}
+    ]
+    return sorted(actionable, key=lambda issue: severity_order[issue.severity.upper()])
+
+
+def format_agentic_issue_findings(
+    issues: Sequence[DiagnosticIssue],
+    *,
+    provider_status: str,
+    duration: float,
+    report_directory: Path,
+) -> str:
+    """Render issue-centered agentic reasoning without dumping the full report."""
+
+    actionable = _actionable_agentic_issues(issues)
+    lines = [
+        "",
+        "SCREWDRIVER — AGENTIC ISSUE ANALYSIS",
+        "─" * _WIDTH,
+        f"Analysis engine: {provider_status}",
+        "",
+    ]
+    if not actionable:
+        lines.append("No evidence-backed actionable issues detected.")
+    else:
+        noun = "issue" if len(actionable) == 1 else "issues"
+        lines.extend([f"{len(actionable)} actionable {noun}", ""])
+        for index, issue in enumerate(actionable, start=1):
+            lines.append(f"{index}. [{issue.severity.upper()}] {issue.title}")
+            lines.append(f"   Classification: {issue.classification}")
+            if issue.operational_impact:
+                lines.append(f"   Impact: {issue.operational_impact}")
+            if issue.observed:
+                lines.append(f"   Evidence: {issue.observed[0]}")
+            if issue.probable_causes:
+                lines.append(f"   Likely cause: {issue.probable_causes[0]}")
+            if issue.primary_approach:
+                lines.append(f"   Next action: {issue.primary_approach[0]}")
+            if issue.success_criteria:
+                lines.append(f"   Verify: {issue.success_criteria[0]}")
+            lines.append("")
+
+    lines.extend(
+        [
+            f"Local inspection completed in {duration:.2f}s",
+            f"Full analysis saved: {report_directory}",
+        ]
+    )
+    return "\n".join(lines).rstrip()
 
 
 def _run_analyze(args: argparse.Namespace) -> int:
