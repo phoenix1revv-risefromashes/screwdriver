@@ -284,13 +284,14 @@ screwdriver analyze --help
 Collect a new passive snapshot from the current Linux computer:
 
 ```text
-screwdriver inspect [--local | --agentic] [OPTIONS]
+screwdriver inspect [--local | --agentic] [--find-issues] [OPTIONS]
 ```
 
 | Option | Values | Default | Meaning |
 |---|---|---|---|
 | `--local` | Flag | Used when no mode is supplied | Generate local deterministic reports |
 | `--agentic` | Flag | Off | Collect locally and generate the three analysis reports |
+| `--find-issues` | Flag | Off | Run the full inspection but print only actionable warning/error findings; combine with `--agentic` for issue-centered reasoning |
 | `--output` | Path | `reports` | Report root containing `local/` and `agentic/` |
 | `--provider` | `anthropic`, `openai`, `none` | `anthropic` | Analysis provider used with `--agentic` |
 | `--model` | Model ID | Provider default | Override the provider's default model |
@@ -308,6 +309,12 @@ screwdriver inspect
 
 # Explicit local inspection
 screwdriver inspect --local
+
+# Find only actionable local issues in the terminal
+screwdriver inspect --find-issues
+
+# Find issues, then add agentic root-cause reasoning
+screwdriver inspect --find-issues --agentic
 
 # Default agentic inspection: Anthropic, Claude Sonnet 5, medium effort
 screwdriver inspect --agentic

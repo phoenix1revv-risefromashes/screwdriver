@@ -428,6 +428,106 @@ def test_inspect_defaults_to_local_and_writes_all_reports(
     assert "CURRENT DEVICES IN USE BY ROS 2" in text_report
 
 
+def test_find_issues_prints_only_actionable_findings_and_keeps_full_reports(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot()
+    snapshot.findings.extend(
+        [
+            Finding(
+                code="SERIAL_PERMISSION_DENIED",
+                severity=FindingSeverity.ERROR,
+                summary="Serial controller is inaccessible.",
+                evidence="/dev/ttyUSB0 is not accessible to the current user.",
+                recommendation="Check dialout-group access for the serial device.",
+            ),
+            Finding(
+                code="THERMAL_WARNING",
+                severity=FindingSeverity.WARNING,
+                summary="CPU temperature is elevated.",
+                evidence="Peak temperature: 87 C.",
+                recommendation="Check cooling and workload before continuing.",
+            ),
+        ]
+    )
+
+    with patch("screwdriver.cli.collect_host", return_value=snapshot):
+        assert main(["inspect", "--find-issues", "--output", str(tmp_path)]) == 0
+
+    output = capsys.readouterr().out
+    assert "SCREWDRIVER — FIND ISSUES" in output
+    assert "2 issues found" in output
+    assert "[ERROR] Serial controller is inaccessible." in output
+    assert "[WARNING] CPU temperature is elevated." in output
+    assert "No host-resource warnings were detected." not in output
+    assert "HOST IDENTITY" not in output
+    assert "OPERATING SYSTEM" not in output
+    assert "Full scan saved:" in output
+
+    runs = [path for path in (tmp_path / "local").iterdir() if path.name != "latest"]
+    assert len(runs) == 1
+    full_text = (runs[0] / "report.txt").read_text(encoding="utf-8")
+    assert "HOST IDENTITY" in full_text
+    assert "No host-resource warnings were detected." in full_text
+    assert "Serial controller is inaccessible." in full_text
+    assert (runs[0] / "snapshot.json").is_file()
+    assert (runs[0] / "report.html").is_file()
+
+
+def test_find_issues_can_add_agentic_reasoning_without_dumping_full_local_report(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot()
+    snapshot.findings.append(
+        Finding(
+            code="ROS_DOMAIN_ID_INVALID",
+            severity=FindingSeverity.ERROR,
+            summary="ROS_DOMAIN_ID is invalid.",
+            evidence="ROS_DOMAIN_ID=abc",
+            recommendation="Set ROS_DOMAIN_ID to a valid integer and rescan.",
+        )
+    )
+
+    with patch("screwdriver.cli.collect_host", return_value=snapshot):
+        assert (
+            main(
+                [
+                    "inspect",
+                    "--find-issues",
+                    "--agentic",
+                    "--provider",
+                    "none",
+                    "--output",
+                    str(tmp_path),
+                ]
+            )
+            == 0
+        )
+
+    output = capsys.readouterr().out
+    assert "SCREWDRIVER — AGENTIC ISSUE ANALYSIS" in output
+    assert "ROS_DOMAIN_ID is invalid." in output
+    assert "Analysis engine: deterministic analysis" in output
+    assert "HOST IDENTITY" not in output
+    assert "AGENTIC REPORTS" not in output
+    assert "Full analysis saved:" in output
+
+
+def test_find_issues_is_available_with_local_or_agentic_mode() -> None:
+    parser = build_parser()
+
+    local = parser.parse_args(["inspect", "--find-issues"])
+    explicit_local = parser.parse_args(["inspect", "--local", "--find-issues"])
+    agentic = parser.parse_args(["inspect", "--find-issues", "--agentic"])
+
+    assert local.find_issues is True
+    assert explicit_local.find_issues is True
+    assert agentic.find_issues is True
+    assert agentic.agentic is True
+
+
 def test_agentic_mode_separates_local_and_agentic_report_sets(
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
