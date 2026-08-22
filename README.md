@@ -1,6 +1,6 @@
 # Screwdriver
 
-[![Release](https://img.shields.io/badge/release-v1.0.0-0A7EA4.svg)](RELEASE_NOTES.md)
+[![Release](https://img.shields.io/badge/release-v1.1.0-0A7EA4.svg)](RELEASE_NOTES.md)
 [![CI](https://github.com/phoenix1revv-risefromashes/screwdriver/actions/workflows/ci.yml/badge.svg)](https://github.com/phoenix1revv-risefromashes/screwdriver/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -497,7 +497,7 @@ Targets are validated, commands run without a shell, time and output are bounded
 rejected requests remain visible. Probes run only when the snapshot hostname matches the
 current computer.
 
-## Known limitations in v1.0.0
+## Known limitations in v1.1.0
 
 - Screwdriver reports only what passive inspection can establish. It does not prove
   real-world sensor accuracy, actuator motion, navigation success, or task completion.
