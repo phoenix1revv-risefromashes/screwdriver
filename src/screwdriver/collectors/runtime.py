@@ -7,6 +7,8 @@ import re
 import shutil
 import subprocess
 import time
+from collections.abc import Iterable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -22,9 +24,10 @@ from screwdriver.models import (
 )
 
 _COMMAND_TIMEOUT_SECONDS = 6.0
+_DIRECT_DISCOVERY_SPIN_SECONDS = 2.0
 _DETAIL_TIMEOUT_SECONDS = 2.0
 _TOTAL_BUDGET_SECONDS = 45.0
-_MAX_NODE_DETAILS = 24
+_MAX_NODE_DETAIL_WORKERS = 8
 _MAX_DEVICE_TOPIC_DETAILS = 40
 _MAX_PARAMETER_PROBES = 16
 
@@ -163,29 +166,70 @@ _RUNNING_HINTS = {
     "Navigation2": ("nav2", "planner_server", "controller_server", "bt_navigator"),
     "AMCL": ("amcl",),
     "Robot Localization": ("ekf_node", "ukf_node", "navsat_transform"),
-    "MoveIt": ("move_group", "moveit"),
-    "ros2_control": ("controller_manager", "ros2_control_node"),
     "SLAM Toolbox": ("slam_toolbox",),
     "Cartographer": ("cartographer",),
     "RTAB-Map": ("rtabmap",),
-    "RViz": ("rviz", "rviz2"),
-    "Robot State Publisher": ("robot_state_publisher",),
-    "Gazebo ROS integration": ("gazebo", "gzserver", "gz_sim", "ros_gz"),
+    "ORB-SLAM3": ("orb_slam3", "orbslam3"),
+    "OctoMap": ("octomap_server", "octomap"),
+    "ros2_control": ("controller_manager", "ros2_control_node"),
+    "MoveIt": ("move_group", "moveit"),
+    "MoveIt Servo": ("moveit_servo", "servo_node"),
+    "BehaviorTree.CPP": ("behaviortree_cpp",),
+    "SMACC2": ("smacc2",),
+    "Gazebo": ("gazebo", "gzserver", "gz_sim", "ros_gz"),
+    "Webots": ("webots",),
+    "Isaac Sim ROS Bridge": ("isaac_sim", "isaac-sim", "isaacsim"),
     "Isaac ROS": ("isaac_ros", "nitros"),
-    "Webots ROS integration": ("webots",),
-    "Camera drivers": ("camera", "usb_cam", "v4l2", "realsense"),
-    "LiDAR drivers": ("lidar", "laser", "rplidar", "velodyne", "ouster"),
+    "RViz": ("rviz", "rviz2"),
+    "Foxglove Bridge": ("foxglove_bridge",),
+    "Robot State Publisher": ("robot_state_publisher",),
+    "PlotJuggler": ("plotjuggler",),
     "micro-ROS": ("micro_ros",),
-    "Audio and speech": ("audio_capture", "audio_play", "speech", "whisper", "tts"),
-    "Teleoperation": ("teleop", "joy_node"),
-    "Rosbag": ("ros2 bag", "rosbag2"),
-    "Diagnostics": ("diagnostic_aggregator", "diagnostic_updater"),
+    "teleop_twist_keyboard": ("teleop_twist_keyboard",),
+    "teleop_twist_joy": ("teleop_twist_joy",),
+    "joy": ("joy_node", "joy"),
+    "Rosbag2": ("ros2 bag", "rosbag2"),
+    "diagnostic_aggregator": ("diagnostic_aggregator",),
+    "diagnostic_updater": ("diagnostic_updater",),
+    "rqt": ("rqt",),
+    "image_pipeline": ("image_proc", "image_pipeline"),
+    "depth_image_proc": ("depth_image_proc",),
+    "point_cloud_transport": ("point_cloud_transport",),
+    "PCL ROS": ("pcl_ros",),
+    "AprilTag ROS": ("apriltag", "apriltag_ros"),
+    "ArUco ROS": ("aruco", "aruco_ros"),
+    "usb_cam": ("usb_cam",),
+    "v4l2_camera": ("v4l2_camera",),
+    "RealSense ROS": ("realsense2_camera",),
+    "ZED ROS 2": ("zed_wrapper", "zed_camera"),
+    "Azure Kinect ROS Driver": ("azure_kinect",),
+    "RPLIDAR ROS": ("rplidar",),
+    "Velodyne ROS": ("velodyne",),
+    "Ouster ROS": ("ouster",),
+    "Hokuyo / urg_node": ("urg_node", "hokuyo"),
+    "Livox ROS Driver 2": ("livox",),
+    "ublox": ("ublox",),
+    "nmea_navsat_driver": ("nmea_navsat_driver",),
+    "Septentrio GNSS Driver": ("septentrio",),
+    "imu_filter_madgwick": ("imu_filter_madgwick",),
+    "laser_filters": ("laser_filter",),
+    "pointcloud_to_laserscan": ("pointcloud_to_laserscan",),
+    "ros2_canopen": ("canopen",),
+    "ros2_socketcan": ("socketcan",),
+    "rosbridge_suite": ("rosbridge",),
+    "ros1_bridge": ("ros1_bridge", "dynamic_bridge"),
+    "domain_bridge": ("domain_bridge",),
+    "Open-RMF": ("rmf_", "rmf_fleet", "rmf_traffic"),
+    "MAVROS": ("mavros",),
+    "PX4 ROS 2": ("px4",),
+    "Autoware": ("autoware",),
+    "twist_mux": ("twist_mux",),
     "Docker": ("dockerd", "docker"),
     "Podman": ("podman",),
     "Apptainer": ("apptainer", "singularity"),
-    "Webots": ("webots",),
     "Isaac Sim": ("isaac-sim", "isaac sim"),
 }
+
 
 _STACK_ENDPOINT_PROFILES: dict[str, dict[str, tuple[str, ...]]] = {
     "Navigation2": {
@@ -248,9 +292,18 @@ class RuntimeInventory:
     findings: list[Finding] = field(default_factory=list)
 
 
+@dataclass(frozen=True, slots=True)
+class NodeProbeContext:
+    """Describe one ROS CLI environment/mode that directly observed a node."""
+
+    executable: str
+    environment: dict[str, str]
+    no_daemon: bool
+
+
 @dataclass(slots=True)
 class GraphDiscovery:
-    """Hold one ROS graph probe and the environment that discovered it."""
+    """Hold one ROS graph probe and the environments that observed its nodes."""
 
     executable: str
     environment: dict[str, str]
@@ -261,6 +314,104 @@ class GraphDiscovery:
     actions: list[tuple[str, str]]
     mode: str
     environment_recovered: bool
+    node_contexts: dict[str, list[NodeProbeContext]] = field(default_factory=dict)
+    probe_contexts: list[NodeProbeContext] = field(default_factory=list)
+
+
+def collect_software_stack_inventory(static_components: list[Component]) -> list[Component]:
+    """Return the passive software-stack inventory without requiring ROS graph discovery."""
+
+    return _software_inventory(
+        static_components,
+        process_text=_running_process_text(),
+        ros_graph_running=False,
+    )
+
+
+def collect_runtime_fallback(static_components: list[Component]) -> RuntimeInventory:
+    """Recover software stacks and the basic ROS graph after deep enrichment fails."""
+
+    process_text = _running_process_text()
+    deadline = time.monotonic() + _TOTAL_BUDGET_SECONDS
+    discovery = _discover_ros_graph(_ros_environment_candidates(), deadline)
+
+    if discovery is None:
+        return RuntimeInventory(
+            software_stacks=_software_inventory(
+                static_components,
+                process_text=process_text,
+                ros_graph_running=False,
+            ),
+            ros_runtime=[_ros_summary("UNAVAILABLE")],
+            findings=[
+                Finding(
+                    code="ROS_RUNTIME_FALLBACK_UNAVAILABLE",
+                    severity=FindingSeverity.WARNING,
+                    summary=(
+                        "Deep runtime enrichment failed and the basic ROS graph could not be "
+                        "recovered."
+                    ),
+                )
+            ],
+        )
+
+    nodes = discovery.nodes
+    topics = discovery.topics
+    services = discovery.services
+    actions = discovery.actions
+    graph_state, graph_status = _graph_state(discovery.results, nodes, topics)
+    graph_running = graph_state == "RUNNING"
+    ros_runtime = [
+        _ros_summary(
+            graph_state,
+            status=graph_status,
+            nodes=len(nodes),
+            topics=len(topics),
+            services=len(services),
+            actions=len(actions),
+            detailed_nodes=0,
+            environment=discovery.environment,
+            discovery_mode=discovery.mode,
+            environment_recovered=discovery.environment_recovered,
+        ),
+        *(
+            Component(
+                category="ROS node",
+                name=node,
+                status=ComponentStatus.OK,
+                details={"state": "DISCOVERED", "detail_probe": "fallback"},
+            )
+            for node in nodes
+        ),
+        *_endpoint_components("ROS topic", topics),
+        *_endpoint_components("ROS service", services),
+        *_endpoint_components("ROS action", actions),
+    ]
+    return RuntimeInventory(
+        software_stacks=_software_inventory(
+            static_components,
+            process_text=process_text,
+            ros_graph_running=graph_running,
+            nodes=nodes,
+            topics=topics,
+            actions=actions,
+        ),
+        ros_runtime=_deduplicate(ros_runtime),
+        findings=[
+            Finding(
+                code="RUNTIME_ENRICHMENT_FALLBACK",
+                severity=FindingSeverity.WARNING,
+                summary=(
+                    "Deep runtime enrichment failed; Screwdriver preserved the basic ROS graph "
+                    "and software-stack inventory."
+                ),
+                evidence=(
+                    f"Recovered {len(nodes)} nodes, {len(topics)} topics, "
+                    f"{len(services)} services, and {len(actions)} actions."
+                ),
+            )
+        ],
+    )
 
 
 def collect_runtime_inventory(
@@ -318,22 +469,10 @@ def collect_runtime_inventory(
     actions = discovery.actions
     publishers: dict[str, list[str]] = {}
     subscribers: dict[str, list[str]] = {}
-    node_results: dict[str, CommandResult] = {}
-    node_details: dict[str, dict[str, list[str]] | None] = {}
+    node_results, node_details = _probe_all_node_details(discovery, deadline)
 
-    for node in nodes[:_MAX_NODE_DETAILS]:
-        result = _run_ros2(
-            ros2_path,
-            ("node", "info", node),
-            deadline=deadline,
-            timeout=_DETAIL_TIMEOUT_SECONDS,
-            environment=environment,
-            no_daemon=discovery.mode != "daemon",
-        )
-        details = _parse_node_info(result.stdout) if result.succeeded else None
-        node_results[node] = result
-        node_details[node] = details
-
+    for node in nodes:
+        details = node_details.get(node)
         if details is not None:
             for topic in details["publishers"]:
                 publishers.setdefault(topic, []).append(node)
@@ -393,7 +532,7 @@ def collect_runtime_inventory(
             topics=len(topics),
             services=len(services),
             actions=len(actions),
-            detailed_nodes=min(len(nodes), _MAX_NODE_DETAILS),
+            detailed_nodes=sum(details is not None for details in node_details.values()),
             environment=environment,
             discovery_mode=discovery.mode,
             environment_recovered=discovery.environment_recovered,
@@ -481,12 +620,23 @@ def collect_runtime_inventory(
     _correlate_ros_devices_with_physical(devices, usb_devices, serial_devices)
 
     findings = _command_findings(results)
-    if discovery.mode != "daemon":
+    if discovery.mode == "direct DDS":
         findings.append(
             Finding(
                 code="ROS_RUNTIME_DISCOVERY_RECOVERED",
                 severity=FindingSeverity.INFO,
                 summary="[OK] ROS 2 graph discovery recovered using a direct DDS probe.",
+                evidence=_environment_evidence(environment),
+            )
+        )
+    elif discovery.mode == "merged graph":
+        findings.append(
+            Finding(
+                code="ROS_RUNTIME_DISCOVERY_MERGED",
+                severity=FindingSeverity.INFO,
+                summary=(
+                    "[OK] ROS 2 graph was assembled from multiple compatible discovery views."
+                ),
                 evidence=_environment_evidence(environment),
             )
         )
@@ -548,21 +698,25 @@ def _discover_ros_graph(
     environments: list[dict[str, str]],
     deadline: float,
 ) -> GraphDiscovery | None:
+    """Probe ROS environments and merge compatible partial graph views."""
+
     commands = {
         "nodes": ("node", "list"),
         "topics": ("topic", "list", "-t"),
         "services": ("service", "list", "-t"),
         "actions": ("action", "list", "-t"),
     }
-    best: GraphDiscovery | None = None
-    best_score = -1
+    discoveries: list[GraphDiscovery] = []
 
     for environment_index, environment in enumerate(environments):
         executable = _ros2_executable(environment, prefer_shutil=environment_index == 0)
         if executable is None:
             continue
 
-        for no_daemon in (False, True):
+        # Probe both direct DDS and the daemon. Either view can be incomplete on a
+        # live robot, so the final graph is assembled from compatible observations
+        # instead of accepting the first non-empty result.
+        for no_daemon in (True, False):
             results = {
                 name: _run_ros2(
                     executable,
@@ -573,6 +727,21 @@ def _discover_ros_graph(
                 )
                 for name, arguments in commands.items()
             }
+
+            # Node discovery is sampled twice in both daemon and direct-DDS modes.
+            # The graph can still be converging when the first command exits, and a
+            # second passive observation prevents a transient partial list from
+            # becoming the report's node inventory.
+            if time.monotonic() < deadline:
+                repeated_nodes = _run_ros2(
+                    executable,
+                    commands["nodes"],
+                    deadline=deadline,
+                    environment=environment,
+                    no_daemon=no_daemon,
+                )
+                results["nodes"] = _merge_line_command_results(results["nodes"], repeated_nodes)
+
             nodes = _lines(results["nodes"].stdout) if results["nodes"].succeeded else []
             topics = (
                 _parse_typed_names(results["topics"].stdout) if results["topics"].succeeded else []
@@ -587,33 +756,237 @@ def _discover_ros_graph(
                 if results["actions"].succeeded
                 else []
             )
-            discovery = GraphDiscovery(
+            context = NodeProbeContext(
                 executable=executable,
                 environment=environment,
-                results=results,
-                nodes=nodes,
-                topics=topics,
-                services=services,
-                actions=actions,
-                mode="direct DDS" if no_daemon else "daemon",
-                environment_recovered=environment_index > 0,
+                no_daemon=no_daemon,
             )
-            score = (
-                (1000 if nodes or topics else 0)
-                + len(nodes)
-                + len(topics)
-                + sum(result.succeeded for result in results.values())
+            discoveries.append(
+                GraphDiscovery(
+                    executable=executable,
+                    environment=environment,
+                    results=results,
+                    nodes=nodes,
+                    topics=topics,
+                    services=services,
+                    actions=actions,
+                    mode="direct DDS" if no_daemon else "daemon",
+                    environment_recovered=environment_index > 0,
+                    node_contexts={node: [context] for node in nodes},
+                    probe_contexts=[context],
+                )
             )
-            if score > best_score:
-                best = discovery
-                best_score = score
-            if nodes or topics:
-                return discovery
 
             if time.monotonic() >= deadline:
-                return best
+                break
+        if time.monotonic() >= deadline:
+            break
 
-    return best
+    return _merge_graph_discoveries(discoveries)
+
+
+def _merge_line_command_results(first: CommandResult, second: CommandResult) -> CommandResult:
+    """Merge repeated line-oriented command observations without losing evidence."""
+
+    if first.succeeded and second.succeeded:
+        lines = list(dict.fromkeys([*_lines(first.stdout), *_lines(second.stdout)]))
+        stdout = "\n".join(lines)
+        return CommandResult("ok", stdout=f"{stdout}\n" if stdout else "")
+    if second.succeeded:
+        return second
+    return first
+
+
+def _merge_graph_discoveries(discoveries: list[GraphDiscovery]) -> GraphDiscovery | None:
+    """Merge partial graph views within each ROS domain, then choose the fullest domain."""
+
+    if not discoveries:
+        return None
+
+    by_domain: dict[str, list[GraphDiscovery]] = {}
+    for discovery in discoveries:
+        domain = discovery.environment.get("ROS_DOMAIN_ID", "0") or "0"
+        by_domain.setdefault(domain, []).append(discovery)
+
+    merged = [_merge_graph_domain(group) for group in by_domain.values()]
+    return max(merged, key=_graph_discovery_score)
+
+
+def _merge_graph_domain(discoveries: list[GraphDiscovery]) -> GraphDiscovery:
+    """Return one graph containing the union of observations for a ROS domain."""
+
+    representative = max(discoveries, key=_graph_discovery_score)
+    nodes = list(dict.fromkeys(node for item in discoveries for node in item.nodes))
+    topics = _merge_typed_entries(item.topics for item in discoveries)
+    services = _merge_typed_entries(item.services for item in discoveries)
+    actions = _merge_typed_entries(item.actions for item in discoveries)
+    results = {
+        name: _best_command_result([item.results[name] for item in discoveries])
+        for name in ("nodes", "topics", "services", "actions")
+    }
+
+    contributing = [
+        item for item in discoveries if item.nodes or item.topics or item.services or item.actions
+    ]
+    mode = representative.mode if len(contributing) <= 1 else "merged graph"
+    environment_recovered = representative.environment_recovered or any(
+        item.environment_recovered for item in contributing
+    )
+    probe_contexts = _unique_probe_contexts(
+        context for item in discoveries for context in item.probe_contexts
+    )
+    node_contexts = {
+        node: _unique_probe_contexts(
+            context for item in discoveries for context in item.node_contexts.get(node, [])
+        )
+        for node in nodes
+    }
+
+    return GraphDiscovery(
+        executable=representative.executable,
+        environment=representative.environment,
+        results=results,
+        nodes=nodes,
+        topics=topics,
+        services=services,
+        actions=actions,
+        mode=mode,
+        environment_recovered=environment_recovered,
+        node_contexts=node_contexts,
+        probe_contexts=probe_contexts,
+    )
+
+
+def _unique_probe_contexts(contexts: Iterable[NodeProbeContext]) -> list[NodeProbeContext]:
+    """Deduplicate ROS probe contexts while preferring daemon-backed lookup first."""
+
+    unique: dict[tuple[str, tuple[str, ...], bool], NodeProbeContext] = {}
+    for context in contexts:
+        key = (
+            context.executable,
+            _environment_key(context.environment),
+            context.no_daemon,
+        )
+        unique.setdefault(key, context)
+    return sorted(unique.values(), key=lambda context: context.no_daemon)
+
+
+def _node_probe_order(discovery: GraphDiscovery, node: str) -> list[NodeProbeContext]:
+    """Return exact observing contexts first, then same-domain fallbacks."""
+
+    exact = _unique_probe_contexts(discovery.node_contexts.get(node, []))
+    exact_keys = {
+        (context.executable, _environment_key(context.environment), context.no_daemon)
+        for context in exact
+    }
+    fallback = [
+        context
+        for context in _unique_probe_contexts(discovery.probe_contexts)
+        if (
+            context.executable,
+            _environment_key(context.environment),
+            context.no_daemon,
+        )
+        not in exact_keys
+    ]
+    return [*exact, *fallback]
+
+
+def _probe_one_node_detail(
+    discovery: GraphDiscovery,
+    node: str,
+    deadline: float,
+) -> tuple[CommandResult, dict[str, list[str]] | None]:
+    """Enrich one discovered node using the environment/mode that actually saw it."""
+
+    last_result = CommandResult("not_probed")
+    for context in _node_probe_order(discovery, node):
+        result = _run_ros2(
+            context.executable,
+            ("node", "info", node),
+            deadline=deadline,
+            timeout=_DETAIL_TIMEOUT_SECONDS,
+            environment=context.environment,
+            no_daemon=context.no_daemon,
+        )
+        last_result = result
+        if result.succeeded:
+            return result, _parse_node_info(result.stdout)
+        if result.state == "budget_exhausted":
+            break
+    return last_result, None
+
+
+def _probe_all_node_details(
+    discovery: GraphDiscovery,
+    deadline: float,
+) -> tuple[
+    dict[str, CommandResult],
+    dict[str, dict[str, list[str]] | None],
+]:
+    """Probe every discovered node; never truncate the live graph to a detail cap."""
+
+    nodes = list(dict.fromkeys(discovery.nodes))
+    if not nodes:
+        return {}, {}
+
+    results: dict[str, CommandResult] = {}
+    details: dict[str, dict[str, list[str]] | None] = {}
+    workers = min(_MAX_NODE_DETAIL_WORKERS, len(nodes))
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="screwdriver-ros") as pool:
+        futures = {
+            pool.submit(_probe_one_node_detail, discovery, node, deadline): node for node in nodes
+        }
+        for future in as_completed(futures):
+            node = futures[future]
+            try:
+                result, node_details = future.result()
+            except Exception as exception:  # pragma: no cover - defensive isolation
+                result = CommandResult("failed", error=str(exception))
+                node_details = None
+            results[node] = result
+            details[node] = node_details
+
+    # Preserve deterministic report ordering even though probes run concurrently.
+    return (
+        {node: results.get(node, CommandResult("not_probed")) for node in nodes},
+        {node: details.get(node) for node in nodes},
+    )
+
+
+def _graph_discovery_score(discovery: GraphDiscovery) -> tuple[int, int, int, int, int, int]:
+    """Rank graph observations by useful graph coverage, then direct-DDS freshness."""
+
+    return (
+        len(discovery.nodes),
+        len(discovery.topics),
+        len(discovery.services),
+        len(discovery.actions),
+        sum(result.succeeded for result in discovery.results.values()),
+        1 if discovery.mode == "direct DDS" else 0,
+    )
+
+
+def _best_command_result(results: list[CommandResult]) -> CommandResult:
+    """Choose the most useful command result from compatible graph observations."""
+
+    return max(results, key=lambda result: (result.succeeded, len(result.stdout)))
+
+
+def _merge_typed_entries(
+    groups: Iterable[list[tuple[str, str]]],
+) -> list[tuple[str, str]]:
+    """Merge typed ROS endpoint lists while retaining any concrete type evidence."""
+
+    merged: dict[str, str] = {}
+    for entries in groups:
+        for name, endpoint_type in entries:
+            current = merged.get(name)
+            if current is None or current == "unknown":
+                merged[name] = endpoint_type
+            elif endpoint_type != "unknown" and endpoint_type not in current.split(" | "):
+                merged[name] = f"{current} | {endpoint_type}"
+    return list(merged.items())
 
 
 def _run_ros2(
@@ -632,6 +1005,8 @@ def _run_ros2(
     bounded_timeout = max(0.05, min(timeout, remaining))
     command = [executable, *arguments]
     if no_daemon and arguments[0] in {"node", "topic", "service", "action"}:
+        if len(arguments) >= 2 and arguments[1] == "list":
+            command.extend(["--spin-time", str(_DIRECT_DISCOVERY_SPIN_SECONDS)])
         command.append("--no-daemon")
     command_environment = (environment or os.environ).copy()
     command_environment["PYTHONUNBUFFERED"] = "1"
@@ -2261,4 +2636,9 @@ def _decode_output(value: str | bytes | None) -> str:
     return value.decode(errors="replace") if isinstance(value, bytes) else value
 
 
-__all__ = ["RuntimeInventory", "collect_runtime_inventory"]
+__all__ = [
+    "RuntimeInventory",
+    "collect_runtime_fallback",
+    "collect_runtime_inventory",
+    "collect_software_stack_inventory",
+]

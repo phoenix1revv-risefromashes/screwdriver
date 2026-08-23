@@ -342,11 +342,12 @@ class PowerInfo:
 
 @dataclass(slots=True)
 class NetworkInterface:
-    """Describe one interface without retaining IPv6 addresses."""
+    """Describe one local network interface and its IP addresses."""
 
     name: str
     interface_type: str = "unknown"
     ipv4_addresses: list[str] = field(default_factory=list)
+    ipv6_addresses: list[str] = field(default_factory=list)
     mac_address: str | None = None
     state: str = "unknown"
     mtu: int | None = None
@@ -362,6 +363,7 @@ class NetworkInterface:
             "name": self.name,
             "interface_type": self.interface_type,
             "ipv4_addresses": self.ipv4_addresses.copy(),
+            "ipv6_addresses": self.ipv6_addresses.copy(),
             "mac_address": self.mac_address,
             "state": self.state,
             "mtu": self.mtu,
@@ -497,6 +499,8 @@ class SerialDevice:
     manufacturer: str | None = None
     product_name: str | None = None
     serial_number: str | None = None
+    hardware_verified: bool = False
+    verification: str | None = None
     device_node: DeviceNode | None = None
 
     @property
@@ -531,6 +535,8 @@ class SerialDevice:
             "product_name": self.product_name,
             "display_name": self.display_name,
             "serial_number": self.serial_number,
+            "hardware_verified": self.hardware_verified,
+            "verification": self.verification,
             "device_node": self.device_node.to_dict() if self.device_node else None,
         }
 
@@ -551,12 +557,14 @@ class SystemSnapshot:
     network: NetworkInfo
     usb_devices: list[USBDevice] = field(default_factory=list)
     serial_devices: list[SerialDevice] = field(default_factory=list)
+    display_inventory: list[Component] = field(default_factory=list)
+    hardware_bus_inventory: list[Component] = field(default_factory=list)
     software_stack_inventory: list[Component] = field(default_factory=list)
     sensor_inventory: list[Component] = field(default_factory=list)
     actuator_inventory: list[Component] = field(default_factory=list)
     ros_device_inventory: list[Component] = field(default_factory=list)
     ros_runtime_inventory: list[Component] = field(default_factory=list)
-    schema_version: str = "3.2"
+    schema_version: str = "3.3"
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     components: list[Component] = field(default_factory=list)
     findings: list[Finding] = field(default_factory=list)
@@ -578,6 +586,10 @@ class SystemSnapshot:
             "network": self.network.to_dict(),
             "usb_devices": [device.to_dict() for device in self.usb_devices],
             "serial_devices": [device.to_dict() for device in self.serial_devices],
+            "display_inventory": [component.to_dict() for component in self.display_inventory],
+            "hardware_bus_inventory": [
+                component.to_dict() for component in self.hardware_bus_inventory
+            ],
             "software_stack_inventory": [
                 component.to_dict() for component in self.software_stack_inventory
             ],

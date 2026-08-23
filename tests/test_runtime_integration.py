@@ -72,11 +72,77 @@ def test_runtime_failure_does_not_destroy_host_snapshot(
         raise RuntimeError("simulated collector failure")
 
     monkeypatch.setattr(collectors, "collect_runtime_inventory", fail)
+    monkeypatch.setattr(collectors, "collect_runtime_fallback", fail)
 
     snapshot = collectors.collect_host()
 
     assert snapshot.identity.hostname
     assert snapshot.ros_runtime_inventory[0].details["state"] == "UNAVAILABLE"
+    assert any(finding.code == "RUNTIME_INVENTORY_FAILED" for finding in snapshot.findings)
+
+
+def test_runtime_failure_preserves_recovered_graph_and_software_stacks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base_snapshot = collectors._collect_host()
+    static_stack = Component(
+        category="robotics software stack",
+        name="Robot State Publisher",
+        status=ComponentStatus.OK,
+        details={
+            "installed": True,
+            "detected_packages": "robot_state_publisher",
+            "version": "robot_state_publisher 3.0.3",
+        },
+    )
+    recovered_stack = Component(
+        category="software stack",
+        name="Robot State Publisher",
+        status=ComponentStatus.OK,
+        details={
+            "state": "INSTALLED_INACTIVE",
+            "detected_packages": "robot_state_publisher",
+            "version": "robot_state_publisher 3.0.3",
+        },
+    )
+    recovered_graph = Component(
+        category="ROS runtime",
+        name="ROS 2 graph",
+        status=ComponentStatus.OK,
+        details={"state": "RUNNING", "nodes": 5},
+    )
+    recovered_node = Component(
+        category="ROS node",
+        name="/cutie_mic_recorder",
+        status=ComponentStatus.OK,
+        details={"state": "DISCOVERED"},
+    )
+
+    monkeypatch.setattr(collectors, "_collect_host", lambda: base_snapshot)
+    monkeypatch.setattr(
+        collectors,
+        "collect_robotics_software",
+        lambda: ([static_stack], []),
+    )
+
+    def fail(*_arguments: object) -> RuntimeInventory:
+        raise RuntimeError("simulated deep enrichment failure")
+
+    monkeypatch.setattr(collectors, "collect_runtime_inventory", fail)
+    monkeypatch.setattr(
+        collectors,
+        "collect_runtime_fallback",
+        lambda *_arguments: RuntimeInventory(
+            software_stacks=[recovered_stack],
+            ros_runtime=[recovered_graph, recovered_node],
+        ),
+    )
+
+    snapshot = collectors.collect_host()
+
+    assert snapshot.software_stack_inventory == [recovered_stack]
+    assert snapshot.ros_runtime_inventory == [recovered_graph, recovered_node]
+    assert snapshot.ros_runtime_inventory[0].details["nodes"] == 5
     assert any(finding.code == "RUNTIME_INVENTORY_FAILED" for finding in snapshot.findings)
 
 

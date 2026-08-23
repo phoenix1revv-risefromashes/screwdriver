@@ -17,6 +17,7 @@ dependencies = [
 
 [project.scripts]
 screwdriver = "screwdriver.cli:main"
+screwdriver-ssh = "screwdriver.ssh_client:main"
 
 
 [dependency-groups]

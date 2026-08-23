@@ -17,6 +17,7 @@ from screwdriver.safety import (
 
 _SYSFS_TTY_ROOT = Path("/sys/class/tty")
 _DEV_ROOT = Path("/dev")
+_PROC_SERIAL = Path("/proc/tty/driver/serial")
 _SUPPORTED_PREFIXES = (
     "ttyUSB",
     "ttyACM",
@@ -39,6 +40,7 @@ def collect_serial_devices(
     sysfs_root: Path = _SYSFS_TTY_ROOT,
     dev_root: Path = _DEV_ROOT,
     policy: SafetyPolicy | None = None,
+    proc_serial: Path = _PROC_SERIAL,
 ) -> list[SerialDevice]:
     """Return serial ports without opening them or changing line state."""
 
@@ -68,13 +70,23 @@ def collect_serial_devices(
         node_path = dev_root / entry.name
         node = _describe_device_node(node_path)
         usb_parent = _find_usb_parent(hardware_path)
+        driver = _find_driver(hardware_path)
+        hardware_verified, verification = _verify_serial_hardware(
+            entry.name,
+            hardware_path,
+            driver=driver,
+            usb_parent=usb_parent,
+            stable_id=stable_id_paths.get(_resolved(node_path)),
+            physical_path=physical_paths.get(_resolved(node_path)),
+            proc_serial=proc_serial,
+        )
 
         devices.append(
             SerialDevice(
                 port=str(node_path),
                 sysfs_name=entry.name,
                 transport=_transport(entry.name, usb_parent is not None),
-                driver=_find_driver(hardware_path),
+                driver=driver,
                 stable_id_path=stable_id_paths.get(_resolved(node_path)),
                 physical_path=physical_paths.get(_resolved(node_path)),
                 usb_vendor_id=_read_text(usb_parent / "idVendor") if usb_parent else None,
@@ -82,11 +94,77 @@ def collect_serial_devices(
                 manufacturer=_read_text(usb_parent / "manufacturer") if usb_parent else None,
                 product_name=_read_text(usb_parent / "product") if usb_parent else None,
                 serial_number=_read_text(usb_parent / "serial") if usb_parent else None,
+                hardware_verified=hardware_verified,
+                verification=verification,
                 device_node=node,
             )
         )
 
     return devices
+
+
+def _verify_serial_hardware(
+    name: str,
+    hardware_path: Path,
+    *,
+    driver: str | None,
+    usb_parent: Path | None,
+    stable_id: str | None,
+    physical_path: str | None,
+    proc_serial: Path,
+) -> tuple[bool, str]:
+    """Classify whether a TTY has positive evidence of a real serial interface."""
+
+    if usb_parent is not None:
+        return True, "USB parent with vendor/product identity"
+    if stable_id:
+        return True, "stable /dev/serial/by-id identity"
+    if physical_path:
+        return True, "stable /dev/serial/by-path identity"
+
+    if name.startswith("ttyS"):
+        state = _ttyS_hardware_state(name, proc_serial)
+        if state:
+            return True, state
+        generic_drivers = {None, "", "port", "serial", "serial8250"}
+        if driver not in generic_drivers:
+            return True, f"bound platform serial driver: {driver}"
+        return False, "serial8250 kernel slot without confirmed UART hardware"
+
+    generic_drivers = {None, "", "port", "serial", "serial8250"}
+    if driver not in generic_drivers:
+        return True, f"bound platform serial driver: {driver}"
+
+    if name.startswith(("ttyTHS", "ttyAMA", "ttymxc", "ttyO", "ttyMSM", "ttyXRUSB")):
+        if hardware_path.exists():
+            return True, "platform serial device with sysfs hardware ancestry"
+
+    if name.startswith("rfcomm"):
+        return True, "Bluetooth RFCOMM serial endpoint"
+    return False, "no independent serial-hardware identity established"
+
+
+def _ttyS_hardware_state(name: str, proc_serial: Path) -> str | None:
+    try:
+        index = int(name.removeprefix("ttyS"))
+    except ValueError:
+        return None
+    try:
+        lines = proc_serial.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return None
+
+    prefix = f"{index}:"
+    for line in lines:
+        stripped = line.strip()
+        if not stripped.startswith(prefix):
+            continue
+        lowered = stripped.lower()
+        if "uart:unknown" in lowered or "port:00000000" in lowered:
+            return None
+        if "uart:" in lowered and "port:" in lowered:
+            return f"/proc/tty/driver/serial confirms {stripped}"
+    return None
 
 
 def _index_links(directory: Path) -> dict[Path, str]:

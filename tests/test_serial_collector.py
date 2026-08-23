@@ -144,3 +144,63 @@ def test_policy_rejects_collection_when_passive_reads_are_not_authorized(
         assert str(error) == "blocked for test"
     else:
         raise AssertionError("collector did not enforce its safety policy")
+
+
+def test_ttys_kernel_slot_is_preserved_but_marked_unverified(tmp_path: Path) -> None:
+    sysfs_root = tmp_path / "sys/class/tty"
+    hardware = tmp_path / "sys/devices/platform/serial8250/tty/ttyS17"
+    dev_root = tmp_path / "dev"
+    proc_serial = tmp_path / "proc/tty/driver/serial"
+
+    hardware.mkdir(parents=True)
+    (sysfs_root / "ttyS17").mkdir(parents=True)
+    (sysfs_root / "ttyS17/device").symlink_to(hardware)
+    dev_root.mkdir(parents=True)
+    (dev_root / "ttyS17").touch()
+    _write(proc_serial, "17: uart:unknown port:00000000 irq:0\n")
+
+    node = DeviceNode(
+        path=str(dev_root / "ttyS17"),
+        node_type="character",
+        permissions="crw-rw----",
+        owner="root",
+        group="dialout",
+        readable=True,
+        writable=True,
+    )
+    with patch("screwdriver.collectors.serial._describe_device_node", return_value=node):
+        devices = collect_serial_devices(sysfs_root, dev_root, proc_serial=proc_serial)
+
+    assert len(devices) == 1
+    assert devices[0].hardware_verified is False
+    assert "kernel slot" in (devices[0].verification or "")
+
+
+def test_ttys_real_uart_is_marked_verified_from_proc_serial(tmp_path: Path) -> None:
+    sysfs_root = tmp_path / "sys/class/tty"
+    hardware = tmp_path / "sys/devices/platform/serial8250/tty/ttyS0"
+    dev_root = tmp_path / "dev"
+    proc_serial = tmp_path / "proc/tty/driver/serial"
+
+    hardware.mkdir(parents=True)
+    (sysfs_root / "ttyS0").mkdir(parents=True)
+    (sysfs_root / "ttyS0/device").symlink_to(hardware)
+    dev_root.mkdir(parents=True)
+    (dev_root / "ttyS0").touch()
+    _write(proc_serial, "0: uart:16550A port:000003F8 irq:4 tx:0 rx:0\n")
+
+    node = DeviceNode(
+        path=str(dev_root / "ttyS0"),
+        node_type="character",
+        permissions="crw-rw----",
+        owner="root",
+        group="dialout",
+        readable=True,
+        writable=True,
+    )
+    with patch("screwdriver.collectors.serial._describe_device_node", return_value=node):
+        devices = collect_serial_devices(sysfs_root, dev_root, proc_serial=proc_serial)
+
+    assert len(devices) == 1
+    assert devices[0].hardware_verified is True
+    assert "/proc/tty/driver/serial confirms" in (devices[0].verification or "")

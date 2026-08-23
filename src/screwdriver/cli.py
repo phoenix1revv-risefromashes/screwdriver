@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 import argparse
+import getpass
+import os
+import shutil
+import subprocess
 import time
+import webbrowser
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
+from urllib.parse import quote
 
 from screwdriver import __version__
 from screwdriver.agent_providers import (
@@ -67,6 +73,11 @@ def build_parser() -> argparse.ArgumentParser:
             "Run the full inspection but print only actionable warning/error findings. "
             "Combine with --agentic for issue-centered reasoning."
         ),
+    )
+    inspect_parser.add_argument(
+        "--no-open",
+        action="store_true",
+        help="Save the local HTML report without opening it in a desktop browser.",
     )
     inspect_parser.add_argument(
         "--focus",
@@ -196,7 +207,20 @@ def _run_inspect(args: argparse.Namespace) -> int:
         progress.close()
 
     duration = collection_duration
-    if not args.find_issues:
+    if not args.find_issues and not args.agentic:
+        opened, browser_note = _open_visual_report(
+            report_paths.html_report,
+            disabled=args.no_open,
+        )
+        print(
+            format_local_completion(
+                report_paths,
+                duration=duration,
+                opened=opened,
+                browser_note=browser_note,
+            )
+        )
+    elif not args.find_issues:
         print(report)
     elif not args.agentic:
         print(
@@ -235,6 +259,111 @@ def _run_inspect(args: argparse.Namespace) -> int:
             print(f"Problems reported: {len(outcome.issues)}")
             print(f"Read-only probes:  {len(outcome.probes)}")
     return 0
+
+
+def _open_visual_report(path: Path, *, disabled: bool) -> tuple[bool, str]:
+    """Open the report on this machine when this is a local graphical session."""
+
+    if disabled:
+        return False, "disabled by --no-open"
+
+    # A process inside a normal SSH session cannot execute a browser on the SSH
+    # client computer. The client-side screwdriver-ssh wrapper handles that case.
+    if _is_ssh_session():
+        return False, "client-side opening available via screwdriver-ssh"
+
+    uri = path.resolve().as_uri()
+    for executable, command in (
+        ("xdg-open", ["xdg-open", uri]),
+        ("gio", ["gio", "open", uri]),
+    ):
+        if not shutil.which(executable):
+            continue
+        try:
+            completed = subprocess.run(
+                command,
+                check=False,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=8.0,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        if completed.returncode == 0:
+            return True, f"opened locally via {executable}"
+
+    try:
+        if webbrowser.open(uri, new=2):
+            return True, "opened locally via browser"
+    except (OSError, webbrowser.Error):
+        pass
+    return False, "local browser launch failed"
+
+
+def _is_ssh_session() -> bool:
+    return bool(os.environ.get("SSH_CONNECTION") or os.environ.get("SSH_TTY"))
+
+
+def _ssh_server_host() -> str | None:
+    connection = os.environ.get("SSH_CONNECTION", "").split()
+    if len(connection) >= 3:
+        return connection[2]
+    return None
+
+
+def _url_host(host: str) -> str:
+    return f"[{host}]" if ":" in host and not host.startswith("[") else host
+
+
+def _remote_report_uri(path: Path) -> str | None:
+    host = _ssh_server_host()
+    if not host:
+        return None
+    user = quote(getpass.getuser(), safe="")
+    remote_path = quote(path.resolve().as_posix(), safe="/")
+    return f"sftp://{user}@{_url_host(host)}{remote_path}"
+
+
+def _ssh_client_command() -> str | None:
+    host = _ssh_server_host()
+    if not host:
+        return None
+    target = f"{getpass.getuser()}@{host}"
+    return f'screwdriver-ssh {target} --cwd "{Path.cwd()}" inspect'
+
+
+def format_local_completion(
+    paths: ReportPaths,
+    *,
+    duration: float,
+    opened: bool,
+    browser_note: str,
+) -> str:
+    """Render a concise handoff with directly usable report links."""
+
+    html_path = paths.html_report.resolve()
+    lines = [
+        "",
+        f"Inspection complete · {duration:.2f}s",
+        f"HTML report: {html_path}",
+        f"Report link: {html_path.as_uri()}",
+        f"Text report: {paths.text_report.resolve()}",
+        f"Browser: {browser_note}",
+    ]
+    if _is_ssh_session():
+        remote_uri = _remote_report_uri(html_path)
+        if remote_uri:
+            lines.append(f"Remote report link: {remote_uri}")
+        command = _ssh_client_command()
+        if command:
+            lines.extend(
+                [
+                    "Client auto-open command (run on the SSH client PC):",
+                    f"  {command}",
+                ]
+            )
+    return "\n".join(lines).rstrip()
 
 
 def _actionable_findings(snapshot: SystemSnapshot) -> list[Finding]:
@@ -743,11 +872,8 @@ def format_snapshot(
     for interface in visible_interfaces:
         network_lines.extend(_format_network_interface(interface))
 
-    network_lines.extend(
-        [
-            "IPv6:              excluded by output preference",
-            f"Virtual interfaces: {len(hidden_interfaces)} detected, hidden from summary",
-        ]
+    network_lines.append(
+        f"Virtual interfaces: {len(hidden_interfaces)} detected, hidden from summary"
     )
 
     if hidden_interfaces:
@@ -773,13 +899,31 @@ def format_snapshot(
         "",
     ]
 
-    if not snapshot.serial_devices:
-        serial_lines.append("No hardware-backed serial/TTY ports were discovered.")
+    visible_serial = [
+        device for device in snapshot.serial_devices if _serial_should_display(device)
+    ]
+    hidden_serial = len(snapshot.serial_devices) - len(visible_serial)
 
-    for index, serial_device in enumerate(snapshot.serial_devices, start=1):
+    if not visible_serial:
+        serial_lines.append("No verified serial/TTY interfaces were discovered.")
+
+    for index, serial_device in enumerate(visible_serial, start=1):
         serial_lines.extend(_format_serial_device(serial_device, index))
 
+    if hidden_serial:
+        serial_lines.append(
+            f"{hidden_serial} unverified kernel TTY candidate"
+            f"{'s' if hidden_serial != 1 else ''} retained in snapshot.json."
+        )
+
     lines.extend(_section("SERIAL / TTY DIAGNOSTICS", serial_lines))
+
+    display_lines: list[str] = []
+    if not snapshot.display_inventory:
+        display_lines.append("No connected DRM display units were detected.")
+    for index, display in enumerate(snapshot.display_inventory, start=1):
+        display_lines.extend(_format_display_unit(display, index))
+    lines.extend(_section("DISPLAY UNITS", display_lines))
 
     if snapshot.software_stack_inventory:
         lines.extend(
@@ -871,6 +1015,7 @@ def _format_network_interface(interface: NetworkInterface) -> list[str]:
         _row("  Type", interface.interface_type),
         _row("  State", interface.state),
         _row("  IPv4", ", ".join(interface.ipv4_addresses) or "none"),
+        _row("  IPv6", ", ".join(interface.ipv6_addresses) or "none"),
         _row("  MAC", interface.mac_address),
         _row(
             "  Link speed",
@@ -925,6 +1070,43 @@ def _format_usb_device(device: USBDevice, index: int) -> list[str]:
 
     lines.append("")
     return lines
+
+
+def _format_display_unit(component: Component, index: int) -> list[str]:
+    details = component.details
+    return [
+        f"Display unit {index}: {component.name}",
+        _row("  Type", "Display"),
+        _row("  Connector", details.get("connector")),
+        _row("  State", details.get("state")),
+        _row("  Enabled", details.get("enabled")),
+        _row("  Resolution", details.get("resolution")),
+        _row("  Driver", details.get("driver")),
+        "",
+    ]
+
+
+def _serial_should_display(device: SerialDevice) -> bool:
+    """Return whether a serial record has positive evidence for the human report."""
+
+    if device.verification is not None:
+        return device.hardware_verified
+    name = Path(device.port).name
+    if device.usb_id or device.stable_id_path or device.physical_path:
+        return True
+    return name.startswith(
+        (
+            "ttyUSB",
+            "ttyACM",
+            "ttyTHS",
+            "ttyAMA",
+            "ttymxc",
+            "ttyO",
+            "ttyMSM",
+            "ttyXRUSB",
+            "rfcomm",
+        )
+    )
 
 
 def _format_serial_device(device: SerialDevice, index: int) -> list[str]:
