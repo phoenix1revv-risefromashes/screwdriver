@@ -57,10 +57,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         screwdriver_args = ["inspect"]
     if screwdriver_args[0] != "inspect":
         raise SystemExit("screwdriver-ssh currently supports the inspect workflow only")
-    if "--find-issues" in screwdriver_args or "--agentic" in screwdriver_args:
-        raise SystemExit(
-            "screwdriver-ssh currently opens the standard local inspection report only"
-        )
     if "--no-open" not in screwdriver_args:
         screwdriver_args.append("--no-open")
 
@@ -154,7 +150,8 @@ def _copy_report_from_remote(
     else:
         destination = destination.expanduser().resolve()
         destination.mkdir(parents=True, exist_ok=True)
-    local_path = destination / "report.html"
+    remote_name = Path(remote_path).name or "report.html"
+    local_path = destination / remote_name
 
     cat_command = f"cat -- {shlex.quote(remote_path)}"
     try:

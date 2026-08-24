@@ -490,7 +490,7 @@ def test_inspect_defaults_to_local_and_writes_all_reports(
     assert '"report_timezone": "America/Los_Angeles"' in snapshot_json
     assert '"created_at": "2026-08-10T05:00:00-07:00"' in snapshot_json
     assert "Snapshot SHA-256:" in text_report
-    assert "Screwdriver:      1.1.0" in text_report
+    assert "Screwdriver:      1.2.0" in text_report
     assert "software_stacks=1" in (run / "inspection.log").read_text(encoding="utf-8")
     assert "ros_devices=4" in (run / "inspection.log").read_text(encoding="utf-8")
     assert "CURRENT DEVICES IN USE BY ROS 2" in text_report
@@ -651,7 +651,13 @@ def test_find_issues_can_add_agentic_reasoning_without_dumping_full_local_report
         )
     )
 
-    with patch("screwdriver.cli.collect_host", return_value=snapshot):
+    with (
+        patch("screwdriver.cli.collect_host", return_value=snapshot),
+        patch(
+            "screwdriver.cli._open_visual_report",
+            return_value=(True, "opened locally via test"),
+        ) as opener,
+    ):
         assert (
             main(
                 [
@@ -674,6 +680,19 @@ def test_find_issues_can_add_agentic_reasoning_without_dumping_full_local_report
     assert "HOST IDENTITY" not in output
     assert "AGENTIC REPORTS" not in output
     assert "Full analysis saved:" in output
+    assert "Agentic System Diagnostic Report" in output
+    agentic_run = next(path for path in (tmp_path / "agentic").iterdir() if path.name != "latest")
+    assert (agentic_run / "system-blueprint.html").is_file()
+    assert (agentic_run / "diagnostic-report.html").is_file()
+    assert not (agentic_run / "compact_snapshot.html").exists()
+    assert {path.name for path in agentic_run.iterdir()} == {
+        "system-blueprint.html",
+        "diagnostic-report.html",
+    }
+    opener.assert_called_once_with(
+        agentic_run / "diagnostic-report.html",
+        disabled=False,
+    )
 
 
 def test_find_issues_is_available_with_local_or_agentic_mode() -> None:
@@ -689,13 +708,16 @@ def test_find_issues_is_available_with_local_or_agentic_mode() -> None:
     assert agentic.agentic is True
 
 
-def test_agentic_mode_separates_local_and_agentic_report_sets(
+def test_agentic_mode_generates_only_blueprint_and_opens_it(
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
 ) -> None:
-    with patch(
-        "screwdriver.cli.collect_host",
-        return_value=_snapshot(),
+    with (
+        patch("screwdriver.cli.collect_host", return_value=_snapshot()),
+        patch(
+            "screwdriver.cli._open_visual_report",
+            return_value=(True, "opened locally via test"),
+        ) as opener,
     ):
         assert (
             main(
@@ -712,23 +734,126 @@ def test_agentic_mode_separates_local_and_agentic_report_sets(
         )
 
     output = capsys.readouterr().out
-    assert "Inspection mode: agentic" in output
-    assert "System blueprint:" in output
-    assert "Compact snapshot:" in output
-    assert "Diagnostic report:" in output
-    assert "Problems reported:" in output
+    assert "Agentic System Blueprint Report" in output
+    assert "HTML report:" in output
+    assert "Analysis engine: deterministic analysis" in output
+    assert "Compact snapshot:" not in output
+    assert "Agentic System Diagnostic Report:" in output
+
     local_runs = [path for path in (tmp_path / "local").iterdir() if path.name != "latest"]
     agentic_runs = [path for path in (tmp_path / "agentic").iterdir() if path.name != "latest"]
     assert len(local_runs) == len(agentic_runs) == 1
     assert local_runs[0].name == agentic_runs[0].name
     assert (local_runs[0] / "snapshot.json").is_file()
-    assert (agentic_runs[0] / "compact_snapshot.html").is_file()
     assert (agentic_runs[0] / "system-blueprint.html").is_file()
     assert (agentic_runs[0] / "diagnostic-report.html").is_file()
-    assert (agentic_runs[0] / "agent-analysis.json").is_file()
-    assert (agentic_runs[0] / "report-manifest.json").is_file()
+    assert not (agentic_runs[0] / "compact_snapshot.html").exists()
+    assert {path.name for path in agentic_runs[0].iterdir()} == {
+        "system-blueprint.html",
+        "diagnostic-report.html",
+    }
     assert (tmp_path / "local" / "latest").resolve() == local_runs[0].resolve()
     assert (tmp_path / "agentic" / "latest").resolve() == agentic_runs[0].resolve()
+    opener.assert_called_once_with(
+        agentic_runs[0] / "system-blueprint.html",
+        disabled=False,
+    )
+
+
+def test_agentic_mode_writes_blueprint_and_diagnostic_when_issue_exists(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot()
+    snapshot.findings.append(
+        Finding(
+            code="MEMORY_HIGH_USAGE",
+            severity=FindingSeverity.WARNING,
+            summary="Physical memory usage is above 90%.",
+            evidence="Measured usage: 91.0%",
+            recommendation="Identify the process consuming memory; verify usage again.",
+        )
+    )
+
+    with (
+        patch("screwdriver.cli.collect_host", return_value=snapshot),
+        patch(
+            "screwdriver.cli._open_visual_report",
+            return_value=(True, "opened locally via test"),
+        ) as opener,
+    ):
+        assert (
+            main(
+                [
+                    "inspect",
+                    "--agentic",
+                    "--provider",
+                    "none",
+                    "--output",
+                    str(tmp_path),
+                ]
+            )
+            == 0
+        )
+
+    output = capsys.readouterr().out
+    agentic_run = next(path for path in (tmp_path / "agentic").iterdir() if path.name != "latest")
+    assert (agentic_run / "system-blueprint.html").is_file()
+    assert (agentic_run / "diagnostic-report.html").is_file()
+    assert {path.name for path in agentic_run.iterdir()} == {
+        "system-blueprint.html",
+        "diagnostic-report.html",
+    }
+    assert "Agentic System Diagnostic Report:" in output
+    # Plain --agentic still opens the Blueprint; the Diagnostic is generated
+    # automatically for the issue and is available beside it.
+    opener.assert_called_once_with(
+        agentic_run / "system-blueprint.html",
+        disabled=False,
+    )
+
+
+def test_find_issues_agentic_writes_diagnostic_even_when_no_issue(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    with (
+        patch("screwdriver.cli.collect_host", return_value=_snapshot()),
+        patch(
+            "screwdriver.cli._open_visual_report",
+            return_value=(True, "opened locally via test"),
+        ) as opener,
+    ):
+        assert (
+            main(
+                [
+                    "inspect",
+                    "--find-issues",
+                    "--agentic",
+                    "--provider",
+                    "none",
+                    "--output",
+                    str(tmp_path),
+                ]
+            )
+            == 0
+        )
+
+    agentic_run = next(path for path in (tmp_path / "agentic").iterdir() if path.name != "latest")
+    assert (agentic_run / "system-blueprint.html").is_file()
+    assert (agentic_run / "diagnostic-report.html").is_file()
+    assert {path.name for path in agentic_run.iterdir()} == {
+        "system-blueprint.html",
+        "diagnostic-report.html",
+    }
+    diagnostic = (agentic_run / "diagnostic-report.html").read_text(encoding="utf-8")
+    assert "No issues found right now." in diagnostic
+    output = capsys.readouterr().out
+    assert "Agentic System Diagnostic Report" in output
+    opener.assert_called_once_with(
+        agentic_run / "diagnostic-report.html",
+        disabled=False,
+    )
 
 
 def test_repeated_inspections_never_overwrite_timestamped_runs(tmp_path: Path) -> None:
@@ -836,7 +961,7 @@ def test_focus_requires_agentic_mode() -> None:
     assert error.value.code == 2
 
 
-def test_analyze_existing_snapshot_generates_timestamped_agentic_reports(
+def test_analyze_existing_snapshot_generates_exactly_two_agentic_reports(
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
 ) -> None:
@@ -862,14 +987,48 @@ def test_analyze_existing_snapshot_generates_timestamped_agentic_reports(
     )
     output = capsys.readouterr().out
     assert "SCREWDRIVER AGENTIC ANALYSIS" in output
+    assert "Agentic System Blueprint Report:" in output
+    assert "Agentic System Diagnostic Report:" in output
     assert "Repairs executed:  no" in output
     runs = [path for path in (output_path / "agentic").iterdir() if path.name != "latest"]
     assert len(runs) == 1
     assert (output_path / "agentic" / "latest").resolve() == runs[0].resolve()
-    assert (runs[0] / "compact_snapshot.html").is_file()
+    assert not (runs[0] / "compact_snapshot.html").exists()
     assert (runs[0] / "system-blueprint.html").is_file()
     assert (runs[0] / "diagnostic-report.html").is_file()
-    assert (runs[0] / "agent-analysis.json").is_file()
+    assert {path.name for path in runs[0].iterdir()} == {
+        "system-blueprint.html",
+        "diagnostic-report.html",
+    }
+
+
+def test_analyze_local_latest_uses_real_scan_id_instead_of_latest(tmp_path: Path) -> None:
+    snapshot = _snapshot()
+    with patch("screwdriver.cli.collect_host", return_value=snapshot):
+        assert main(["inspect", "--no-open", "--output", str(tmp_path)]) == 0
+
+    local_run = next(path for path in (tmp_path / "local").iterdir() if path.name != "latest")
+    latest_snapshot = tmp_path / "local" / "latest" / "snapshot.json"
+    assert latest_snapshot.resolve() == (local_run / "snapshot.json").resolve()
+
+    assert (
+        main(
+            [
+                "analyze",
+                str(latest_snapshot),
+                "--provider",
+                "none",
+                "--output",
+                str(tmp_path),
+            ]
+        )
+        == 0
+    )
+
+    agentic_runs = [path for path in (tmp_path / "agentic").iterdir() if path.name != "latest"]
+    assert len(agentic_runs) == 1
+    assert agentic_runs[0].name == local_run.name
+    assert agentic_runs[0].name != "latest"
 
 
 def test_html_hides_system_bus_noise_but_keeps_robot_relevant_bus_devices(
@@ -1095,3 +1254,36 @@ def test_ros_device_usage_correlates_audio_nodes_to_single_usb_audio_device(
     assert "/dev/snd/pcmC2D0c" in ros_device_section
     assert "/speaker_node" in ros_device_section
     assert "/dev/snd/pcmC2D0p" in ros_device_section
+
+
+def test_agentic_no_open_disables_selected_report_launch(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    with (
+        patch("screwdriver.cli.collect_host", return_value=_snapshot()),
+        patch("screwdriver.cli._open_visual_report", wraps=_open_visual_report) as opener,
+    ):
+        assert (
+            main(
+                [
+                    "inspect",
+                    "--agentic",
+                    "--provider",
+                    "none",
+                    "--no-open",
+                    "--output",
+                    str(tmp_path),
+                ]
+            )
+            == 0
+        )
+
+    output = capsys.readouterr().out
+    assert "Agentic System Blueprint Report" in output
+    assert "Browser: disabled by --no-open" in output
+    agentic_run = next(path for path in (tmp_path / "agentic").iterdir() if path.name != "latest")
+    opener.assert_called_once_with(
+        agentic_run / "system-blueprint.html",
+        disabled=True,
+    )

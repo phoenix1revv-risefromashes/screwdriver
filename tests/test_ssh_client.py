@@ -58,3 +58,72 @@ def test_remote_command_preserves_home_expansion_for_tilde_cwd() -> None:
         ["inspect", "--no-open"],
     )
     assert command == 'cd "$HOME"/pro_projects/screwdriver && screwdriver inspect --no-open'
+
+
+def test_client_wrapper_supports_agentic_blueprint_and_preserves_report_name(
+    capsys,
+    tmp_path: Path,
+) -> None:
+    copied = tmp_path / "agentic-system-blueprint-report.html"
+    copied.write_text("<html>blueprint</html>", encoding="utf-8")
+    commands: list[list[str]] = []
+
+    def fake_run_remote(command):
+        commands.append(list(command))
+        return "/home/phoenix/reports/agentic/run/agentic-system-blueprint-report.html", 0
+
+    with (
+        patch("screwdriver.ssh_client._run_remote", side_effect=fake_run_remote),
+        patch("screwdriver.ssh_client._copy_report_from_remote", return_value=copied) as copier,
+        patch("screwdriver.ssh_client._open_local_report", return_value=(True, "xdg-open")),
+    ):
+        assert (
+            ssh_client.main(["phoenix@192.168.4.68", "inspect", "--agentic", "--provider", "none"])
+            == 0
+        )
+
+    output = capsys.readouterr().out
+    assert "screwdriver inspect --agentic --provider none --no-open" in commands[0][-1]
+    assert f"Local report: {copied}" in output
+    copier.assert_called_once()
+    assert copier.call_args.kwargs["remote_path"].endswith("agentic-system-blueprint-report.html")
+
+
+def test_client_wrapper_supports_agentic_diagnostic_and_preserves_report_name(
+    capsys,
+    tmp_path: Path,
+) -> None:
+    copied = tmp_path / "agentic-system-diagnostic-report.html"
+    copied.write_text("<html>diagnostic</html>", encoding="utf-8")
+    commands: list[list[str]] = []
+
+    def fake_run_remote(command):
+        commands.append(list(command))
+        return "/home/phoenix/reports/agentic/run/agentic-system-diagnostic-report.html", 0
+
+    with (
+        patch("screwdriver.ssh_client._run_remote", side_effect=fake_run_remote),
+        patch("screwdriver.ssh_client._copy_report_from_remote", return_value=copied) as copier,
+        patch("screwdriver.ssh_client._open_local_report", return_value=(True, "xdg-open")),
+    ):
+        assert (
+            ssh_client.main(
+                [
+                    "phoenix@192.168.4.68",
+                    "inspect",
+                    "--find-issues",
+                    "--agentic",
+                    "--provider",
+                    "none",
+                ]
+            )
+            == 0
+        )
+
+    output = capsys.readouterr().out
+    assert (
+        "screwdriver inspect --find-issues --agentic --provider none --no-open" in commands[0][-1]
+    )
+    assert f"Local report: {copied}" in output
+    copier.assert_called_once()
+    assert copier.call_args.kwargs["remote_path"].endswith("agentic-system-diagnostic-report.html")

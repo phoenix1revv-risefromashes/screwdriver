@@ -753,16 +753,14 @@ def _serial_is_meaningful(device: SerialDevice) -> bool:
     if device.verification is not None:
         return device.hardware_verified
 
-    # Compatibility with snapshots created before explicit verification was added.
+    # Compatibility with snapshots created before explicit verification was
+    # added. USB-backed serial names and stable Linux identities are strong
+    # evidence. Platform UART candidates such as ttyTHS/ttyAMA stay in
+    # snapshot.json unless the collector explicitly verified the hardware.
     name = Path(device.port).name
     if device.usb_id or device.stable_id_path or device.physical_path:
         return True
-    if name.startswith(("ttyUSB", "ttyACM", "ttyTHS", "ttyAMA", "ttymxc", "ttyO")):
-        return True
-    if name.startswith(("ttyMSM", "ttyXRUSB", "rfcomm")):
-        return True
-    generic_drivers = {"", "port", "serial8250", "serial"}
-    return bool(device.driver and device.driver.lower() not in generic_drivers)
+    return name.startswith(("ttyUSB", "ttyACM", "ttyXRUSB", "rfcomm"))
 
 
 def _serial_classification(device: SerialDevice) -> str:
