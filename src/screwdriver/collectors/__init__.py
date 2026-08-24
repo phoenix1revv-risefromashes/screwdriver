@@ -5,7 +5,11 @@ from screwdriver.collectors.host import (
 )
 from screwdriver.collectors.host import collect_network_interfaces
 from screwdriver.collectors.ros import collect_robotics_software
-from screwdriver.collectors.runtime import collect_runtime_inventory
+from screwdriver.collectors.runtime import (
+    collect_runtime_fallback,
+    collect_runtime_inventory,
+    collect_software_stack_inventory,
+)
 from screwdriver.collectors.serial import collect_serial_devices
 from screwdriver.collectors.usb import collect_usb_devices
 from screwdriver.models import (
@@ -15,20 +19,26 @@ from screwdriver.models import (
     FindingSeverity,
     SystemSnapshot,
 )
+from screwdriver.progress import ProgressCallback
 
 
-def collect_host() -> SystemSnapshot:
+def collect_host(progress: ProgressCallback | None = None) -> SystemSnapshot:
     """Collect host, ROS, and robotics-software data without changing state."""
 
-    snapshot = _collect_host()
+    snapshot = _collect_host(progress=progress) if progress else _collect_host()
     _remove_known_false_positives(snapshot)
+    if progress:
+        progress(5, "Inspecting robotics software stack")
     components, findings = collect_robotics_software()
     runtime_components = [*snapshot.components, *components]
+    snapshot.software_stack_inventory = collect_software_stack_inventory(runtime_components)
     snapshot.components.extend(
         component for component in components if component.status is not ComponentStatus.UNKNOWN
     )
     snapshot.findings.extend(findings)
 
+    if progress:
+        progress(6, "Inspecting ROS 2 & runtime")
     try:
         runtime = collect_runtime_inventory(
             runtime_components,
@@ -36,34 +46,58 @@ def collect_host() -> SystemSnapshot:
             snapshot.serial_devices,
         )
     except Exception as exception:  # Defensive boundary: host inspection must still finish.
-        snapshot.ros_runtime_inventory.append(
-            Component(
-                category="ROS runtime",
-                name="ROS 2 graph",
-                status=ComponentStatus.ERROR,
-                details={
-                    "state": "UNAVAILABLE",
-                    "probe": "metadata only; runtime collector failed",
-                },
+        try:
+            fallback = collect_runtime_fallback(runtime_components)
+        except Exception as fallback_exception:
+            snapshot.ros_runtime_inventory.append(
+                Component(
+                    category="ROS runtime",
+                    name="ROS 2 graph",
+                    status=ComponentStatus.ERROR,
+                    details={
+                        "state": "UNAVAILABLE",
+                        "probe": "metadata only; runtime collector failed",
+                    },
+                )
             )
-        )
-        snapshot.findings.append(
-            Finding(
-                code="RUNTIME_INVENTORY_FAILED",
-                severity=FindingSeverity.ERROR,
-                summary="Runtime inventory failed; host inspection still completed.",
-                evidence=f"{type(exception).__name__}: {exception}",
-                recommendation="Review the runtime collector error and run inspection again.",
+            snapshot.findings.append(
+                Finding(
+                    code="RUNTIME_INVENTORY_FAILED",
+                    severity=FindingSeverity.ERROR,
+                    summary="Runtime inventory failed; host inspection still completed.",
+                    evidence=(
+                        f"{type(exception).__name__}: {exception}; "
+                        f"fallback={type(fallback_exception).__name__}: {fallback_exception}"
+                    ),
+                    recommendation="Review the runtime collector error and run inspection again.",
+                )
             )
-        )
+        else:
+            snapshot.software_stack_inventory = fallback.software_stacks
+            snapshot.ros_runtime_inventory = fallback.ros_runtime
+            snapshot.findings.extend(fallback.findings)
+            snapshot.findings.append(
+                Finding(
+                    code="RUNTIME_INVENTORY_FAILED",
+                    severity=FindingSeverity.WARNING,
+                    summary=(
+                        "Deep runtime enrichment failed, but the ROS graph and software-stack "
+                        "inventory were recovered."
+                    ),
+                    evidence=f"{type(exception).__name__}: {exception}",
+                )
+            )
     else:
-        snapshot.software_stack_inventory = runtime.software_stacks
+        if runtime.software_stacks:
+            snapshot.software_stack_inventory = runtime.software_stacks
         snapshot.sensor_inventory = runtime.sensors
         snapshot.actuator_inventory = runtime.actuators
         snapshot.ros_device_inventory = runtime.devices
         snapshot.ros_runtime_inventory = runtime.ros_runtime
         snapshot.findings.extend(runtime.findings)
 
+    if progress:
+        progress(7, "Evaluating system findings")
     _reclassify_conditional_findings(snapshot)
 
     if any(

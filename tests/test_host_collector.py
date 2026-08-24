@@ -43,7 +43,12 @@ def test_collect_network_interfaces() -> None:
                     "family": "inet",
                     "local": "192.168.10.25",
                     "prefixlen": 24,
-                }
+                },
+                {
+                    "family": "inet6",
+                    "local": "fe80::211:22ff:fe33:4455",
+                    "prefixlen": 64,
+                },
             ],
         },
     ]
@@ -64,7 +69,8 @@ def test_collect_network_interfaces() -> None:
 
     assert ethernet.state == "up"
     assert ethernet.mac_address == "00:11:22:33:44:55"
-    assert ethernet.ipv4_addresses
+    assert ethernet.ipv4_addresses == ["192.168.10.25/24"]
+    assert ethernet.ipv6_addresses == ["fe80::211:22ff:fe33:4455/64"]
 
 
 def test_collect_host_returns_structured_snapshot() -> None:

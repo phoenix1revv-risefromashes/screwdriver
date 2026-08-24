@@ -18,6 +18,8 @@ from typing import cast
 
 import psutil
 
+from screwdriver.collectors.bus import collect_hardware_bus_inventory
+from screwdriver.collectors.display import collect_display_units
 from screwdriver.collectors.serial import (
     collect_serial_devices,
 )
@@ -41,30 +43,56 @@ from screwdriver.models import (
     SystemSnapshot,
     ThermalSensor,
 )
+from screwdriver.progress import ProgressCallback
 
 _DMI_ROOT = Path("/sys/class/dmi/id")
 _DEVICE_TREE_ROOT = Path("/proc/device-tree")
 
 
-def collect_host() -> SystemSnapshot:
+def collect_host(progress: ProgressCallback | None = None) -> SystemSnapshot:
     """Collect a complete, machine-neutral snapshot of the current host."""
 
+    if progress:
+        progress(1, "Inspecting host & operating system")
+    identity = collect_identity()
+    operating_system = collect_operating_system()
+
+    if progress:
+        progress(2, "Inspecting compute, memory & storage")
     cpu = collect_cpu()
     platform_info = collect_platform(cpu.vendor)
+    memory = collect_memory()
+    storage_devices = collect_storage_devices()
+    gpus = collect_gpus(platform_info)
+
+    if progress:
+        progress(3, "Discovering hardware & device interfaces")
+    usb_devices = collect_usb_devices()
+    serial_devices = collect_serial_devices()
+    display_inventory = collect_display_units()
+    hardware_bus_inventory = collect_hardware_bus_inventory()
+
+    if progress:
+        progress(4, "Checking network, power & thermals")
+    thermal_sensors = collect_thermal_sensors()
+    power = collect_power(platform_info)
+    network = collect_network()
 
     snapshot = SystemSnapshot(
-        identity=collect_identity(),
-        operating_system=collect_operating_system(),
+        identity=identity,
+        operating_system=operating_system,
         platform=platform_info,
         cpu=cpu,
-        memory=collect_memory(),
-        storage_devices=collect_storage_devices(),
-        gpus=collect_gpus(platform_info),
-        thermal_sensors=collect_thermal_sensors(),
-        power=collect_power(platform_info),
-        network=collect_network(),
-        usb_devices=collect_usb_devices(),
-        serial_devices=collect_serial_devices(),
+        memory=memory,
+        storage_devices=storage_devices,
+        gpus=gpus,
+        thermal_sensors=thermal_sensors,
+        power=power,
+        network=network,
+        usb_devices=usb_devices,
+        serial_devices=serial_devices,
+        display_inventory=display_inventory,
+        hardware_bus_inventory=hardware_bus_inventory,
     )
 
     snapshot.findings.extend(_create_findings(snapshot))
@@ -530,7 +558,7 @@ def collect_power(
 
 
 def collect_network() -> NetworkInfo:
-    """Collect IPv4 interfaces, route, gateway, DNS, driver, and link data."""
+    """Collect IPv4/IPv6 interfaces, route, gateway, DNS, driver, and link data."""
 
     (
         default_interface,
@@ -551,7 +579,7 @@ def collect_network() -> NetworkInfo:
 def collect_network_interfaces(
     default_interface: str | None = None,
 ) -> list[NetworkInterface]:
-    """Collect network interfaces; IPv6 is intentionally excluded."""
+    """Collect network interfaces with both IPv4 and IPv6 addresses."""
 
     output = _run_command(
         [
@@ -602,17 +630,23 @@ def collect_network_interfaces(
         }:
             is_virtual = False
 
-        addresses: list[str] = []
+        ipv4_addresses: list[str] = []
+        ipv6_addresses: list[str] = []
 
         for address in _as_records(record.get("addr_info")):
-            if _as_string(address.get("family")) != "inet":
+            family = _as_string(address.get("family"))
+            if family not in {"inet", "inet6"}:
                 continue
 
             local = _as_string(address.get("local"))
             prefix = _as_int(address.get("prefixlen"))
-
-            if local:
-                addresses.append(f"{local}/{prefix}" if prefix is not None else local)
+            if not local:
+                continue
+            rendered = f"{local}/{prefix}" if prefix is not None else local
+            if family == "inet":
+                ipv4_addresses.append(rendered)
+            else:
+                ipv6_addresses.append(rendered)
 
         operating_state = _as_string(record.get("operstate"))
         state = "up" if "UP" in flags else (operating_state or "unknown").lower()
@@ -621,7 +655,8 @@ def collect_network_interfaces(
             NetworkInterface(
                 name=name,
                 interface_type=kind,
-                ipv4_addresses=addresses,
+                ipv4_addresses=ipv4_addresses,
+                ipv6_addresses=ipv6_addresses,
                 mac_address=_as_string(record.get("address")),
                 state=state,
                 mtu=_as_int(record.get("mtu")),
@@ -1115,6 +1150,8 @@ def _network_kind(
 
     if link_type == "loopback" or name == "lo":
         return "loopback"
+    if link_type == "can" or name.startswith("can"):
+        return "can"
 
     linkinfo = record.get("linkinfo")
     info_kind: str | None = None

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import io
 
-from screwdriver.progress import AnalysisProgress
+from screwdriver.progress import AnalysisProgress, InspectionProgress
 
 
 def test_noninteractive_progress_shows_provider_model_effort_and_real_stages() -> None:
@@ -23,4 +23,24 @@ def test_noninteractive_progress_shows_provider_model_effort_and_real_stages() -
     assert "[3/6] Waiting for claude-sonnet-5 analysis" in rendered
     assert "[4/6] Validating findings against collected evidence" in rendered
     assert "✓ Agentic analysis completed" in rendered
+    assert "\x1b" not in rendered
+
+
+def test_noninteractive_inspection_progress_reports_completed_real_stages() -> None:
+    output = io.StringIO()
+    progress = InspectionProgress(output)
+
+    progress.start("local")
+    progress.stage(1, "Inspecting host & operating system")
+    progress.stage(2, "Inspecting compute, memory & storage")
+    progress.stage(8, "Building & saving inspection reports")
+    progress.finish("Inspection complete")
+
+    rendered = output.getvalue()
+    assert "Screwdriver inspection · local" in rendered
+    assert "[1/8] Inspecting host & operating system" in rendered
+    assert "[2/8] Inspecting compute, memory & storage" in rendered
+    assert "[8/8] Building & saving inspection reports" in rendered
+    assert "✓ Inspection complete" in rendered
+    assert "%" not in rendered
     assert "\x1b" not in rendered

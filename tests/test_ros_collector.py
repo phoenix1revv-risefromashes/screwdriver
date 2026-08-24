@@ -49,12 +49,55 @@ def test_collects_healthy_ros2_environment(
     assert any(component.name == "Navigation2" for component in components)
     assert any(component.name == "AMCL" for component in components)
     nav2 = next(component for component in components if component.name == "Navigation2")
-    assert nav2.details["stack_category"] == "navigation and localization"
+    assert nav2.details["stack_category"] == "Navigation"
     assert nav2.details["capability"] == "autonomous navigation"
     assert nav2.details["state"] == "INSTALLED_NOT_EVALUATED"
     assert nav2.details["running"] is False
     assert any(finding.code == "ROS_ENVIRONMENT_HEALTHY" for finding in findings)
     assert not any(finding.severity is FindingSeverity.ERROR for finding in findings)
+
+
+def test_robotics_stack_catalog_is_broad_and_concrete() -> None:
+    names = [entry[0] for entry in ros._ROBOTICS_STACKS]
+    stack_types = {entry[1] for entry in ros._ROBOTICS_STACKS}
+
+    assert len(names) >= 50
+    for name in (
+        "Navigation2",
+        "SLAM Toolbox",
+        "MoveIt",
+        "Gazebo",
+        "Webots",
+        "Isaac ROS",
+        "RViz",
+        "micro-ROS",
+        "teleop_twist_keyboard",
+        "Rosbag2",
+        "RealSense ROS",
+        "RPLIDAR ROS",
+        "Open-RMF",
+        "MAVROS",
+        "Autoware",
+    ):
+        assert name in names
+
+    for stack_type in (
+        "Navigation",
+        "Localization",
+        "SLAM / Mapping",
+        "Control",
+        "Manipulation",
+        "Simulation",
+        "Teleoperation",
+        "Perception",
+        "LiDAR",
+        "GNSS",
+    ):
+        assert stack_type in stack_types
+
+    assert "Camera drivers" not in names
+    assert "LiDAR drivers" not in names
+    assert "Audio and speech" not in names
 
 
 def test_reports_invalid_domain_and_missing_rmw(

@@ -1,0 +1,26 @@
+Do not git restore the repository.
+
+From the Screwdriver repository root:
+
+  tar -xzf screwdriver-v1.2-ros-nodes-complete-files.tar.gz
+  rm screwdriver-v1.2-ros-nodes-complete-files.tar.gz
+
+Then run:
+
+  .venv/bin/ruff format src tests
+  .venv/bin/ruff check .
+  .venv/bin/ruff format --check .
+  .venv/bin/pytest
+  .venv/bin/mypy src
+  git diff --check
+
+Live verification:
+
+  ros2 node list | sort -u
+  screwdriver inspect
+
+ROS 2 NODES must be:
+
+  Node | State | Publishers | Subscribers
+
+No Services column.

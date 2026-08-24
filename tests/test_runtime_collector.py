@@ -20,6 +20,22 @@ def _stable_ros_environment_candidates(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(runtime, "_ros_environment_candidates", lambda: [{}])
 
 
+def _ros_command_key(arguments: list[str]) -> tuple[str, ...]:
+    """Normalize ros2 CLI discovery options for test fixtures."""
+
+    values = list(arguments[1:])
+    if "--no-daemon" in values:
+        values.remove("--no-daemon")
+    if "--spin-time" in values:
+        index = values.index("--spin-time")
+        del values[index : index + 2]
+    return tuple(values)
+
+
+def _is_direct_discovery(arguments: list[str]) -> bool:
+    return "--no-daemon" in arguments
+
+
 def _static_components() -> list[Component]:
     return [
         Component(
@@ -124,10 +140,7 @@ def test_running_graph_discovers_endpoints_controllers_and_correlations(
         **_kwargs: object,
     ) -> subprocess.CompletedProcess[str]:
         calls.append(arguments)
-        command_arguments = arguments[1:]
-        if command_arguments[-1:] == ["--no-daemon"]:
-            command_arguments = command_arguments[:-1]
-        key = tuple(command_arguments)
+        key = _ros_command_key(arguments)
         return subprocess.CompletedProcess(arguments, 0, outputs.get(key, ""), "")
 
     monkeypatch.setattr(runtime.subprocess, "run", fake_run)
@@ -161,22 +174,166 @@ def test_running_graph_discovers_endpoints_controllers_and_correlations(
     assert navigation.details["capability_state"] == "BLOCKED"
     assert navigation.details["observed_outputs"] == "/cmd_vel"
     assert any(finding.code == "ROS_RUNTIME_DISCOVERED" for finding in result.findings)
-    graph_list_calls = [
-        command
-        for command in calls
-        if tuple(command[1:])
-        in {
-            ("node", "list"),
-            ("topic", "list", "-t"),
-            ("service", "list", "-t"),
-            ("action", "list", "-t"),
-        }
-    ]
+    graph_commands = {
+        ("node", "list"),
+        ("topic", "list", "-t"),
+        ("service", "list", "-t"),
+        ("action", "list", "-t"),
+    }
+    graph_list_calls = [command for command in calls if _ros_command_key(command) in graph_commands]
     control_calls = [command for command in calls if command[1] == "control"]
-    assert len(graph_list_calls) == 4
-    assert all("--no-daemon" not in command for command in graph_list_calls)
+    direct_graph_calls = [command for command in graph_list_calls if "--no-daemon" in command]
+    daemon_graph_calls = [command for command in graph_list_calls if "--no-daemon" not in command]
+    assert len(direct_graph_calls) == 5
+    assert len(daemon_graph_calls) == 5
+    assert all("--spin-time" in command for command in direct_graph_calls)
+    assert all(
+        str(runtime._DIRECT_DISCOVERY_SPIN_SECONDS) in command for command in direct_graph_calls
+    )
     assert all("--no-daemon" not in command for command in control_calls)
     assert not any("publish" in command or "action send_goal" in command for command in calls)
+
+
+def test_graph_discovery_keeps_fullest_recovered_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    environments = [
+        {"PATH": "/usr/bin", "ROS_DOMAIN_ID": "0", "ROS_DISTRO": "humble"},
+        {"PATH": "/usr/bin", "ROS_DOMAIN_ID": "7", "ROS_DISTRO": "humble"},
+    ]
+    monkeypatch.setattr(runtime, "_ros_environment_candidates", lambda: environments)
+    monkeypatch.setattr(runtime, "_ros2_executable", lambda *_args, **_kwargs: "/usr/bin/ros2")
+    monkeypatch.setattr(runtime, "_running_process_text", lambda: "")
+
+    partial_nodes = "/camera_node\n/speaker_node\n"
+    full_nodes = (
+        "/camera_node\n/speaker_node\n/face_display\n/base_controller\n/cutie_mic_recorder\n"
+    )
+
+    def fake_run(
+        arguments: list[str],
+        **kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        environment = kwargs.get("env")
+        assert isinstance(environment, dict)
+        domain = environment.get("ROS_DOMAIN_ID")
+        command = _ros_command_key(arguments)
+        if command == ("node", "list"):
+            output = full_nodes if domain == "7" else partial_nodes
+        elif command == ("topic", "list", "-t"):
+            output = "/camera/image_raw [sensor_msgs/msg/Image]\n"
+        else:
+            output = ""
+        return subprocess.CompletedProcess(arguments, 0, output, "")
+
+    monkeypatch.setattr(runtime.subprocess, "run", fake_run)
+
+    result = runtime.collect_runtime_inventory([], [], [])
+
+    summary = result.ros_runtime[0]
+    assert summary.details["nodes"] == 5
+    assert summary.details["domain_id"] == "7"
+    assert summary.details["environment_recovered"] is True
+    node_names = {item.name for item in result.ros_runtime if item.category == "ROS node"}
+    assert node_names == {
+        "/camera_node",
+        "/speaker_node",
+        "/face_display",
+        "/base_controller",
+        "/cutie_mic_recorder",
+    }
+
+
+def test_graph_discovery_merges_partial_views_in_same_domain(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    environments = [
+        {"PATH": "/usr/bin", "ROS_DOMAIN_ID": "0", "ROS_DISTRO": "humble"},
+    ]
+    monkeypatch.setattr(runtime, "_ros_environment_candidates", lambda: environments)
+    monkeypatch.setattr(runtime, "_ros2_executable", lambda *_args, **_kwargs: "/usr/bin/ros2")
+    monkeypatch.setattr(runtime, "_running_process_text", lambda: "")
+
+    def fake_run(
+        arguments: list[str],
+        **_kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        direct = _is_direct_discovery(arguments)
+        command = _ros_command_key(arguments)
+        if command == ("node", "list"):
+            output = (
+                "/camera_node\n/speaker_node\n"
+                if direct
+                else "/face_display\n/base_controller\n/cutie_mic_recorder\n"
+            )
+        elif command == ("topic", "list", "-t"):
+            output = (
+                "/camera/image_raw [sensor_msgs/msg/Image]\n"
+                if direct
+                else "/cutie/audio/status [std_msgs/msg/String]\n"
+            )
+        else:
+            output = ""
+        return subprocess.CompletedProcess(arguments, 0, output, "")
+
+    monkeypatch.setattr(runtime.subprocess, "run", fake_run)
+
+    result = runtime.collect_runtime_inventory([], [], [])
+
+    summary = result.ros_runtime[0]
+    assert summary.details["nodes"] == 5
+    assert summary.details["topics"] == 2
+    assert summary.details["discovery_mode"] == "merged graph"
+    node_names = {item.name for item in result.ros_runtime if item.category == "ROS node"}
+    assert node_names == {
+        "/camera_node",
+        "/speaker_node",
+        "/face_display",
+        "/base_controller",
+        "/cutie_mic_recorder",
+    }
+    assert any(finding.code == "ROS_RUNTIME_DISCOVERY_MERGED" for finding in result.findings)
+
+
+def test_every_discovered_live_node_is_enriched_without_a_detail_cap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(runtime.shutil, "which", lambda _name: "/usr/bin/ros2")
+    monkeypatch.setattr(runtime, "_running_process_text", lambda: "")
+    expected_nodes = {f"/live_node_{index:02d}" for index in range(37)}
+    node_list = "\n".join(sorted(expected_nodes)) + "\n"
+    info_calls: set[str] = set()
+
+    def fake_run(
+        arguments: list[str],
+        **_kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        command = _ros_command_key(arguments)
+        if command == ("node", "list"):
+            return subprocess.CompletedProcess(arguments, 0, node_list, "")
+        if len(command) == 3 and command[:2] == ("node", "info"):
+            node = command[2]
+            info_calls.add(node)
+            suffix = node.removeprefix("/")
+            output = (
+                f"Publishers:\n  /{suffix}/out: std_msgs/msg/String\n"
+                f"Subscribers:\n  /{suffix}/in: std_msgs/msg/String\n"
+            )
+            return subprocess.CompletedProcess(arguments, 0, output, "")
+        return subprocess.CompletedProcess(arguments, 0, "", "")
+
+    monkeypatch.setattr(runtime.subprocess, "run", fake_run)
+
+    result = runtime.collect_runtime_inventory([], [], [])
+
+    nodes = [item for item in result.ros_runtime if item.category == "ROS node"]
+    assert {item.name for item in nodes} == expected_nodes
+    assert info_calls == expected_nodes
+    assert all(item.details["state"] == "RUNNING" for item in nodes)
+    assert all(item.details.get("publishers") for item in nodes)
+    assert all(item.details.get("subscribers") for item in nodes)
+    assert result.ros_runtime[0].details["nodes"] == len(expected_nodes)
+    assert result.ros_runtime[0].details["detailed_nodes"] == len(expected_nodes)
 
 
 def test_hanging_ros_commands_are_bounded_and_nonfatal(
@@ -211,9 +368,9 @@ def test_failed_node_details_do_not_erase_discovered_node(
         arguments: list[str],
         **_kwargs: object,
     ) -> subprocess.CompletedProcess[str]:
-        if arguments[1:] == ["node", "list", "--no-daemon"]:
+        if _ros_command_key(arguments) == ("node", "list") and _is_direct_discovery(arguments):
             return subprocess.CompletedProcess(arguments, 0, "/camera_node\n", "")
-        if arguments[1:] == ["node", "info", "/camera_node", "--no-daemon"]:
+        if _ros_command_key(arguments) == ("node", "info", "/camera_node"):
             return subprocess.CompletedProcess(arguments, 1, "", "node disappeared")
         return subprocess.CompletedProcess(arguments, 0, "", "")
 
@@ -269,8 +426,8 @@ def test_direct_dds_fallback_recovers_graph_when_daemon_returns_empty(
         arguments: list[str],
         **_kwargs: object,
     ) -> subprocess.CompletedProcess[str]:
-        direct = arguments[-1:] == ["--no-daemon"]
-        command = tuple(arguments[1:-1] if direct else arguments[1:])
+        direct = _is_direct_discovery(arguments)
+        command = _ros_command_key(arguments)
         if direct and command == ("node", "list"):
             return subprocess.CompletedProcess(arguments, 0, "/lidar_node\n", "")
         if direct and command == ("topic", "list", "-t"):
@@ -440,7 +597,7 @@ def test_graph_discovery_uses_environment_recovered_from_running_ros_process(
         environment = kwargs["env"]
         assert isinstance(environment, dict)
         domain = environment.get("ROS_DOMAIN_ID")
-        command = tuple(value for value in arguments[1:] if value != "--no-daemon")
+        command = _ros_command_key(arguments)
         if domain == "7" and command == ("node", "list"):
             return subprocess.CompletedProcess(arguments, 0, "/imu_driver\n", "")
         if domain == "7" and command == ("topic", "list", "-t"):
@@ -518,7 +675,7 @@ def test_ros_device_inventory_covers_non_sensor_hardware_roles(
         arguments: list[str],
         **_kwargs: object,
     ) -> subprocess.CompletedProcess[str]:
-        command = tuple(value for value in arguments[1:] if value != "--no-daemon")
+        command = _ros_command_key(arguments)
         return subprocess.CompletedProcess(arguments, 0, outputs.get(command, ""), "")
 
     monkeypatch.setattr(runtime.subprocess, "run", fake_run)
