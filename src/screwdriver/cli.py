@@ -23,6 +23,7 @@ from screwdriver.agent_providers import (
 )
 from screwdriver.agentic import DiagnosticIssue, analyze_snapshot_file
 from screwdriver.collectors import collect_host
+from screwdriver.custom_analysis import analyze_custom_file, is_native_snapshot
 from screwdriver.models import (
     Component,
     Finding,
@@ -37,6 +38,7 @@ from screwdriver.report_time import REPORT_TIMEZONE_NAME, format_report_time
 from screwdriver.storage import (
     ReportPaths,
     build_report_paths,
+    create_custom_report_directory,
     create_report_run,
     save_reports,
 )
@@ -96,14 +98,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     analyze_parser = subparsers.add_parser(
         "analyze",
-        help="Analyze an existing snapshot and generate organized agentic reports.",
+        help="Analyze a Screwdriver snapshot or arbitrary JSON/YAML/text diagnostic file.",
     )
-    analyze_parser.add_argument("snapshot", type=Path, help="Path to snapshot.json.")
+    analyze_parser.add_argument(
+        "snapshot", type=Path, help="Path to snapshot.json, JSON, YAML, JSONL, LOG or text file."
+    )
     analyze_parser.add_argument(
         "--output",
         type=Path,
         default=Path("reports"),
-        help="Report root containing agentic/<timestamp>/ (default: reports).",
+        help="Report root containing agentic/ and custom/ runs (default: reports).",
     )
     analyze_parser.add_argument(
         "--focus",
@@ -560,6 +564,25 @@ def _run_analyze(args: argparse.Namespace) -> int:
         and resolved_snapshot.parent.parent.name == "local"
         else None
     )
+    if not is_native_snapshot(resolved_snapshot):
+        custom_directory = create_custom_report_directory(args.output)
+        result = analyze_custom_file(
+            resolved_snapshot,
+            custom_directory,
+            provider=args.provider,
+            model=args.model,
+            effort=args.effort,
+            focus=args.focus,
+        )
+        print("SCREWDRIVER CUSTOM FILE ANALYSIS")
+        print("─" * _WIDTH)
+        print(f"Source file:       {args.snapshot}")
+        print(f"Diagnostic Report: {result.report}")
+        print(f"Analysis engine:   {result.provider_status}")
+        print(f"Problems reported: {result.issue_count}")
+        print("Read-only probes:  0 (file-only analysis)")
+        print("Repairs executed:  no")
+        return 0
     run = create_report_run(
         args.output,
         requested_scan_id=source_scan_id,

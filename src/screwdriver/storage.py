@@ -63,6 +63,27 @@ def create_report_run(
     )
 
 
+def create_custom_report_directory(
+    report_root: Path,
+    *,
+    created_at: datetime | None = None,
+) -> Path:
+    """Choose a unique custom-analysis run path, separate from native reports.
+
+    No directories are created here: a failed provider request must not replace
+    the previous successful latest report.
+    """
+    instant = created_at or datetime.now(UTC)
+    base_id = to_report_timezone(instant).strftime("%Y-%m-%d_%H:%M:%S")
+    custom_root = report_root / "custom"
+    candidate = custom_root / base_id
+    suffix = 1
+    while candidate.exists():
+        candidate = custom_root / f"{base_id}_{suffix:02d}"
+        suffix += 1
+    return candidate
+
+
 def save_reports(
     snapshot: SystemSnapshot,
     terminal_report: str,
