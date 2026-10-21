@@ -127,7 +127,7 @@ class AnthropicProvider:
             if block.get("type") == "text"
         )
         try:
-            analysis = _parse_analysis_json(content, "Anthropic")
+            analysis = _parse_analysis_json(content, "Anthropic", request.schema)
         except AgentProviderError:
             if stop_reason == "max_tokens":
                 raise AgentProviderError(
@@ -216,7 +216,7 @@ class OpenAIProvider:
             text_parts.append(str(body["output_text"]))
         content = "".join(text_parts)
         try:
-            analysis = _parse_analysis_json(content, "OpenAI")
+            analysis = _parse_analysis_json(content, "OpenAI", request.schema)
         except AgentProviderError:
             if str(body.get("status") or "") == "incomplete":
                 details = _mapping(body.get("incomplete_details"))
@@ -294,7 +294,9 @@ def _post_json(
             method="POST",
         )
         try:
-            with urllib.request.urlopen(request, timeout=_REQUEST_TIMEOUT_SECONDS) as response:  # noqa: S310
+            with urllib.request.urlopen(  # noqa: S310
+                request, timeout=_REQUEST_TIMEOUT_SECONDS
+            ) as response:
                 body = json.loads(response.read().decode("utf-8"))
             break
         except urllib.error.HTTPError as exception:
@@ -366,7 +368,16 @@ def _is_unsupported_effort_error(status_code: int, message: str) -> bool:
     return mentions_setting and rejects_setting
 
 
-def _parse_analysis_json(content: str, provider_name: str) -> dict[str, Any]:
+def _parse_analysis_json(
+    content: str,
+    provider_name: str,
+    schema: dict[str, Any],
+) -> dict[str, Any]:
+    """Validate provider output against the schema used for this request.
+
+    Native system analysis and custom-file analysis have different top-level
+    fields. Do not require native blueprint fields from arbitrary log analysis.
+    """
     if not content:
         raise AgentProviderError(f"{provider_name} returned no structured text content")
     try:
@@ -375,13 +386,13 @@ def _parse_analysis_json(content: str, provider_name: str) -> dict[str, Any]:
         raise AgentProviderError(f"{provider_name} returned invalid structured JSON") from exception
     if not isinstance(result, dict):
         raise AgentProviderError(f"{provider_name} result must be a JSON object")
-    missing = {
-        "summary",
-        "architecture_observations",
-        "unknowns",
-        "issues",
-        "probe_requests",
-    } - result.keys()
+
+    required = schema.get("required")
+    if not isinstance(required, list) or not all(isinstance(key, str) for key in required):
+        raise AgentProviderError(
+            "invalid provider response schema: expected a required-fields list"
+        )
+    missing = set(required) - result.keys()
     if missing:
         raise AgentProviderError(
             f"{provider_name} result is missing required fields: " + ", ".join(sorted(missing))

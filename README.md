@@ -1,17 +1,21 @@
 # Screwdriver
 
-[![Release](https://img.shields.io/badge/release-v1.2.0-0A7EA4.svg)](docs/releases/v1.2.0.md)
+[![Release](https://img.shields.io/badge/release-v1.3.0-0A7EA4.svg)](docs/releases/v1.3.0.md)
 [![CI](https://github.com/phoenix1revv-risefromashes/screwdriver/actions/workflows/ci.yml/badge.svg)](https://github.com/phoenix1revv-risefromashes/screwdriver/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 <!-- markdownlint-disable MD013 -->
 
-## Agentic Robotics Diagnostics: See the entire system—and what’s wrong with it—in under 30 seconds.
+## Agentic Robotics Diagnostics: See the entire system—and what’s wrong with it—in seconds.
 
-Screwdriver replaces hours of manual robot inspection with one read-only scan. It connects evidence across hardware, drivers, device paths, networking, processes, containers, ROS 2, and robotics software stacks—turning a complex machine into a clear, bottom-to-top system blueprint.
+Want to see through a robot’s entire system architecture, understand how each components connect, and uncover any issues/bugs/misconfigurations in that system before they become bigger problems? Or have a log file full of hidden  issues/errors and need to figure out what’s wrong, why it’s happening, and how to fix it?
 
-Its agentic diagnostic engine surfaces immediate failures, misconfigurations, broken connections, and likely root causes, then delivers diagnostic commands and step-by-step fixes. Run it locally or unlock deeper analysis with OpenAI or Anthropic—all without automatically changing the system or commanding the robot.
+**Screwdriver** replaces hours of manual robot inspection and debugging with a clear system blueprint and actionable diagnostics. It scans hardware, drivers, device paths, networking, processes, containers, ROS 2, and robotics software stacks—revealing how the entire system is built and connected, from the bottom up.
+
+Beyond system discovery, Screwdriver diagnoses failures in two ways: automatically inspecting an entire system or specific subsystem, or using its agentic engine to analyze almost any text-based log, inspection file, or diagnostic report you provide. 
+
+It identifies failures, misconfigurations, broken connections, and likely root causes, delivering evidence-backed findings, diagnostic commands, and step-by-step resolution guidance. Run read-only system inspections locally or use OpenAI or Anthropic for deeper agentic analysis—all without automatically modifying the system or commanding the robot.
 
 ## How it works
 
@@ -115,41 +119,23 @@ The underlying deterministic report is available at:
 reports/local/latest/report.html
 ```
 
-### 6. Re-analyze the saved snapshot later
+### 6. Custom-analyze any of the suscpicious files
+
+This is a special feature of the screwdriver that analyzes almost all of the text based reports/log files (.json, .yml, .yaml, .jsonl, .log, .txt, .log, .csv, .xml, .ini, .cfg) to idenfy the issues/bugs in the system.
+
+
 
 ```bash
 screwdriver analyze \
-  reports/local/latest/snapshot.json
+  1_failure_log.json (fie dir).json \
+  --provider openai (or anthropic)
 ```
 
-This creates a new analysis without collecting the machine again.
 
-### No-key alternatives
-
-Generate the full report suite using deterministic analysis:
-
-```bash
-screwdriver inspect --agentic --provider none
-```
-
-Generate only the local deterministic inspection:
-
-```bash
-screwdriver inspect --local
-```
-
-To use the virtual environment directly:
-
-```bash
-source .venv/bin/activate
-screwdriver --help
-```
-
-Activation must be sourced. Do not execute `.venv/bin/activate` directly.
 
 ## Providers, models, and effort
 
-Screwdriver v1.2 uses the Anthropic Messages API or OpenAI Responses API with strict
+Screwdriver v1.3 uses the Anthropic Messages API or OpenAI Responses API with strict
 JSON-schema output.
 
 Support labels in the tables mean:
@@ -441,7 +427,7 @@ Targets are validated, commands run without a shell, time and output are bounded
 rejected requests remain visible. Probes run only when the snapshot hostname matches the
 current computer.
 
-## Known limitations in v1.2.0
+## Known limitations in v1.3.0
 
 - Screwdriver reports only what passive inspection can establish. It cannot prove real-world sensor accuracy, actuator motion, navigation success, or task completion.
 - Hardware → driver → OS interface → process/ROS ownership is reported only when supported by collected evidence. Missing links remain **not established** rather than being inferred.
@@ -487,11 +473,6 @@ After an intentional dependency change:
 Commit `pyproject.toml` and `uv.lock` together. Do not regenerate the lockfile merely to
 hide an unexpected mismatch.
 
-### ROS 2 is installed but the graph is empty
-
-Run Screwdriver from the same sourced underlay, overlay, domain, and middleware context
-used by the robot application. ROS installation, shell environment, graph discovery,
-and application runtime are separate evidence states.
 
 ## Samples and release notes
 
@@ -503,6 +484,9 @@ and application runtime are separate evidence states.
 
 Publish sanitized samples only. Raw evidence appendices can contain real local system
 identifiers.
+
+
+
 
 ## License
 
