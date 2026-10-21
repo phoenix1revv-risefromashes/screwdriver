@@ -224,3 +224,43 @@ Screwdriver passively identifies and reports:
 
 Runtime evidence distinguishes `NOT_INSTALLED`, `INSTALLED_NOT_EVALUATED`, `RUNNING`,
 connected, integrated, inactive, and unavailable states without activating hardware.
+### Universal custom-file analysis (new)
+
+The same `analyze` command now accepts arbitrary UTF-8 diagnostic files without
+requiring Screwdriver's native `SystemSnapshot` schema:
+
+```bash
+screwdriver analyze report-to-inspect/inspection_log.json --provider openai
+screwdriver analyze report-to-inspect/robot-errors.yaml --provider openai
+screwdriver analyze report-to-inspect/runtime.log --provider openai
+screwdriver analyze report-to-inspect/console.txt --provider openai
+screwdriver analyze report-to-inspect/events.jsonl --provider openai
+```
+
+JSON, JSONL, YAML/YML are parsed structurally; other UTF-8 files (including TXT,
+LOG, CSV, XML, INI and extensionless text files) are analyzed as line-addressable
+text. JSON/YAML evidence is cited by JSON Pointer paths, and text by source line
+numbers (`L12`, `L36`, etc.). Native Screwdriver snapshots retain their original
+analysis and full Blueprint/Diagnostic reports.
+
+For arbitrary files, the output is:
+
+```text
+reports/agentic/<date_timestamp>/diagnostic-report.html
+reports/agentic/<date_timestamp>/custom-analysis.json
+```
+
+The report separates observed evidence, possible root causes, limitations,
+read-only checks, and verification criteria. Provider-generated findings without
+valid source citations are removed, so findings are not assumed to be true just
+because a scenario label states them. Files are read-only; the custom-file path
+never probes the running robot, even with `--investigate`. Missing or failed AI
+providers produce an error rather than a false "healthy" result. `--provider none`
+produces a source coverage report **without** root-cause analysis.
+
+Safety boundaries: UTF-8 text only, 2 MiB source size limit, bounded model input,
+credential/identifier redaction, and no execution of embedded instructions. A
+custom file is **not evidence of the live system's current state**, and simulated
+fault scenarios are labeled accordingly. Because analysis is not a deterministic
+replay of an official snapshot, AI findings are hypotheses grounded in the
+supplied records rather than confirmed live robot failures.

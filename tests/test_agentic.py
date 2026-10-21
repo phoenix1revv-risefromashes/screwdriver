@@ -175,7 +175,7 @@ def test_deterministic_analysis_writes_only_the_two_agentic_report_types(
             assert label in report
         assert "scan-test-001" in report
         assert "test-robot" in report
-        assert "1.2.0" in report
+        assert "1.3.0" in report
         assert "PASSIVE" in report
         assert ">AGENTIC<" in report
         assert "420 ms" in report

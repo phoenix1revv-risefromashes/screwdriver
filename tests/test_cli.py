@@ -490,7 +490,7 @@ def test_inspect_defaults_to_local_and_writes_all_reports(
     assert '"report_timezone": "America/Los_Angeles"' in snapshot_json
     assert '"created_at": "2026-08-10T05:00:00-07:00"' in snapshot_json
     assert "Snapshot SHA-256:" in text_report
-    assert "Screwdriver:      1.2.0" in text_report
+    assert "Screwdriver:      1.3.0" in text_report
     assert "software_stacks=1" in (run / "inspection.log").read_text(encoding="utf-8")
     assert "ros_devices=4" in (run / "inspection.log").read_text(encoding="utf-8")
     assert "CURRENT DEVICES IN USE BY ROS 2" in text_report

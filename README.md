@@ -1,6 +1,6 @@
 # Screwdriver
 
-[![Release](https://img.shields.io/badge/release-v1.2.0-0A7EA4.svg)](docs/releases/v1.2.0.md)
+[![Release](https://img.shields.io/badge/release-v1.3.0-0A7EA4.svg)](docs/releases/v1.3.0.md)
 [![CI](https://github.com/phoenix1revv-risefromashes/screwdriver/actions/workflows/ci.yml/badge.svg)](https://github.com/phoenix1revv-risefromashes/screwdriver/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -503,6 +503,18 @@ and application runtime are separate evidence states.
 
 Publish sanitized samples only. Raw evidence appendices can contain real local system
 identifiers.
+
+## Analyze arbitrary diagnostic files
+
+The `analyze` command supports Screwdriver snapshots and UTF-8 custom JSON,
+JSONL, YAML, TXT, LOG, and other textual diagnostic files:
+
+```bash
+screwdriver analyze report-to-inspect/inspection_log.json --provider openai
+```
+
+Custom files produce an evidence-cited HTML diagnostic report and structured
+`custom-analysis.json`. See `docs/reference/cli.md`.
 
 ## License
 
